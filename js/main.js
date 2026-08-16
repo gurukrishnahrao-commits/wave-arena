@@ -12,6 +12,9 @@ function init() {
   setupInput();
   setupMobileControls();
   setupQuickControls();
+  setupProgressionUI();
+  renderSettingsControls();
+  AudioManager.setMusicMode('menu');
 
   updateLoadingBar(100);
   loadingHideTimer = setTimeout(hideLoadingScreen, 500);
@@ -30,6 +33,45 @@ function setupQuickControls() {
     muteBtn.setAttribute('aria-pressed', String(muted));
     muteBtn.setAttribute('aria-label', muted ? 'Unmute sound' : 'Mute sound');
     muteBtn.title = muted ? 'Unmute sound' : 'Mute sound';
+  };
+}
+
+function setupProgressionUI() {
+  const metaScreen = document.getElementById('meta-screen');
+  const settingsScreen = document.getElementById('settings-screen');
+  const openSettings = () => {
+    renderSettingsControls();
+    settingsScreen.style.display = 'flex';
+  };
+
+  document.getElementById('command-btn').onclick = openMetaScreen;
+  document.getElementById('meta-close').onclick = closeMetaScreen;
+  document.getElementById('settings-btn').onclick = openSettings;
+  document.getElementById('settings-close').onclick = () => { settingsScreen.style.display = 'none'; };
+  document.getElementById('tutorial-skip').onclick = skipPlayableTutorial;
+
+  metaScreen.onclick = e => { if (e.target === metaScreen) closeMetaScreen(); };
+  settingsScreen.onclick = e => { if (e.target === settingsScreen) settingsScreen.style.display = 'none'; };
+
+  const sfx = document.getElementById('sfx-volume');
+  const music = document.getElementById('music-volume');
+  const quality = document.getElementById('quality-select');
+  const shake = document.getElementById('shake-toggle');
+  sfx.oninput = () => updateGameSetting('sfx', Number(sfx.value) / 100);
+  music.oninput = () => updateGameSetting('music', Number(music.value) / 100);
+  quality.onchange = () => updateGameSetting('quality', quality.value);
+  shake.onchange = () => updateGameSetting('shake', shake.checked);
+
+  document.getElementById('reset-progress-btn').onclick = () => {
+    if (!window.confirm('Reset all Wave Arena progression and settings?')) return;
+    try { localStorage.removeItem(META_KEY); localStorage.removeItem(LEGACY_META_KEY); } catch (e) { /* blocked storage */ }
+    window.location.reload();
+  };
+
+  document.getElementById('new-run-btn').onclick = () => window.location.reload();
+  document.getElementById('victory-command-btn').onclick = () => {
+    document.getElementById('victory-screen').style.display = 'none';
+    openMetaScreen();
   };
 }
 
@@ -61,15 +103,16 @@ function gameOver() {
   waveClearPending = false;
   waveCompleteMagnet = false;
   bossDeathPending = false;
+  finalVictoryPending = false;
   timeScale = 1;
-  sentinelIntroId++;
-  hiveIntroId++;
   centerMsgGen++;
   saveMeta();
+  AudioManager.setMusicMode('menu');
+  document.getElementById('tutorial-card').classList.remove('visible');
   document.getElementById('pause-screen').style.display = 'none';
   document.getElementById('pause-btn').setAttribute('aria-pressed', 'false');
 
-  if (bossActive) cleanupBoss();
+  cleanupBoss();
   if (ambientLight) ambientLight.intensity = 0.8;
 
   const el = document.getElementById('center-msg');
@@ -96,6 +139,7 @@ function continueRun() {
   waveClearPending = false;
   waveCompleteMagnet = false;
   bossDeathPending = false;
+  finalVictoryPending = false;
   waveTimer = 0;
   timeScale = 1;
   centerMsgGen++;
@@ -143,6 +187,7 @@ function continueRun() {
   el.innerHTML = '';
 
   gameState = 'playing';
+  AudioManager.setMusicMode(isBossWave(waveNumber) ? 'boss' : 'combat');
   flashCenterMsg(`WAVE ${waveNumber} — CHECKPOINT`, '#3dffd2');
 }
 
@@ -206,25 +251,30 @@ function animate() {
 // ---- START BUTTON ----
 document.getElementById('start-btn').onclick = () => {
   AudioManager.resume();
+  beginRunMeta();
+  applyPermanentProgression();
+  loadout.primary = 'pulse';
+  loadout.secondary = null;
+  loadout.passive = null;
+
   document.getElementById('start-screen').style.display = 'none';
   document.getElementById('hud').style.display = 'flex';
   document.getElementById('quick-controls').style.display = 'flex';
+  document.getElementById('wave-num').textContent = '1';
 
-  showWeaponSelectScreen('primary', (primaryId) => {
-    loadout.primary = primaryId;
-    if (primaryId === 'orbital') fireWeaponOrbital();
+  gameState = 'playing';
+  waveTimer = 0;
+  spawnTimer = 0;
+  saveCheckpoint();
+  clock.getDelta();
 
-    showWeaponSelectScreen('secondary', (secondaryId) => {
-      if (secondaryId) {
-        loadout.secondary = secondaryId;
-        if (secondaryId === 'orbital') fireWeaponOrbital();
-      }
-      gameState = 'playing';
-      waveTimer = 0; // start wave 1 timer fresh
-      saveCheckpoint();
-      clock.getDelta();
-    });
-  });
+  if (metaProgress.tutorialComplete) {
+    beginCampaignWaveOne();
+    flashCenterMsg('PULSE RIFLE ONLINE · WAVE 1', '#3dffd2');
+  } else {
+    AudioManager.setMusicMode('combat');
+    startPlayableTutorial();
+  }
 };
 
 // ---- BOOT ----

@@ -193,7 +193,7 @@ function spawnHiveMotherIntro(def) {
     pulse.position.copy(pos);
     scene.add(pulse);
     tweenValue(0.6, t => { pulse.scale.set(1 + t * 2, 1 + t * 2, 1); pulse.material.opacity = 0.6 * (1 - t); },
-      () => { scene.remove(pulse); });
+      () => { removeAndDispose(pulse); });
   }, 220);
 
   // Stage 2
@@ -244,7 +244,7 @@ function spawnHiveMotherIntro(def) {
   setTimeout(() => {
     if (introId !== hiveIntroId) return;
     document.getElementById('boss-name').textContent = def.name;
-    if (cocoon) { scene.remove(cocoon); cocoon = null; }
+    if (cocoon) { removeAndDispose(cocoon); cocoon = null; }
 
     bossMesh = buildHiveMotherMesh(def);
     bossMesh.position.set(spawnPos.x, def.size * 0.55, spawnPos.z);
@@ -387,7 +387,7 @@ function updateHiveAcidProjectile(bd, delta) {
     ap.mesh.position.lerpVectors(ap.start, ap.target, t);
     ap.mesh.position.y = ap.start.y * (1 - t) + Math.sin(t * Math.PI) * 2.5;
     if (t >= 1) {
-      scene.remove(ap.mesh);
+      removeAndDispose(ap.mesh);
       for (let j = 0; j < 8; j++) spawnDeathParticles(ap.target.clone(), 0x88ff33);
       const puddle = createAcidPuddle(ap.target.x, ap.target.z, 1.6);
       bd.puddles.push({ mesh: puddle.mesh, age: 0, life: 5, radius: 1.6, tickTimer: 0 });
@@ -412,7 +412,7 @@ function updateHiveEggs(bd, delta) {
       if (egg.hatchTimer <= 0) {
         for (let j = 0; j < 6; j++) spawnDeathParticles(egg.mesh.position.clone(), 0x9944ff);
         spawnHatchling(egg.mesh.position);
-        scene.remove(egg.mesh);
+        removeAndDispose(egg.mesh);
         bd.eggs.splice(i, 1);
       }
     }
@@ -486,8 +486,8 @@ function spawnBubblePopFx(pos, big) {
 }
 
 function removeAcidPuddle(p) {
-  scene.remove(p.mesh);
-  if (p.bubbles) for (const b of p.bubbles) scene.remove(b.mesh);
+  removeAndDispose(p.mesh);
+  if (p.bubbles) for (const b of p.bubbles) removeAndDispose(b.mesh);
 }
 
 function updateHivePuddles(bd, delta) {
@@ -530,7 +530,7 @@ function updateHivePuddles(bd, delta) {
           const pt = Math.min(1, b.t / b.popDur);
           b.mesh.scale.setScalar(1 + pt * 0.9);
           b.mesh.material.opacity = k * 0.65 * (1 - pt);
-          if (pt >= 1) { scene.remove(b.mesh); p.bubbles.splice(bi, 1); }
+          if (pt >= 1) { removeAndDispose(b.mesh); p.bubbles.splice(bi, 1); }
         }
       }
     }
@@ -614,20 +614,22 @@ function updateHiveNests(bd, delta) {
       if (flatDist(projectiles[pi].position, nest.mesh.position) < 1.0) {
         nest.hp -= Math.round(stats.attackDamage);
         spawnDeathParticles(nest.mesh.position.clone(), 0xaa55ff);
-        scene.remove(projectiles[pi]); projectiles.splice(pi, 1);
+        const projectile = projectiles[pi];
+        projectiles.splice(pi, 1);
+        releasePlayerProjectile(projectile);
       }
     }
     for (let fi = fireballs.length - 1; fi >= 0; fi--) {
       if (flatDist(fireballs[fi].position, nest.mesh.position) < 1.1) {
         nest.hp -= stats.attackDamage * 4;
         spawnDeathParticles(fireballs[fi].position, 0xff4400);
-        scene.remove(fireballs[fi]); fireballs.splice(fi, 1);
+        removeAndDispose(fireballs[fi]); fireballs.splice(fi, 1);
       }
     }
     if (nest.hp <= 0) {
       for (let k = 0; k < 10; k++) spawnDeathParticles(nest.mesh.position.clone(), 0x9944ff);
       triggerScreenShake(0.2);
-      scene.remove(nest.mesh);
+      removeAndDispose(nest.mesh);
       bd.nests.splice(i, 1);
       bd.currentHp -= bd.hp * 0.04;
       bd.damage *= 0.9;
@@ -741,8 +743,7 @@ function updateHiveShockwaves(bd, delta) {
     sw.mesh.geometry = new THREE.RingGeometry(Math.max(0.05, radius - 0.5), radius, 32);
     sw.mesh.material.opacity = 0.85 * (1 - t);
     if (t >= 1) {
-      scene.remove(sw.mesh);
-      sw.mesh.material.dispose();
+      removeAndDispose(sw.mesh);
       bd.shockwaves.splice(i, 1);
     }
   }
@@ -832,7 +833,7 @@ function updateHiveMotherBoss(delta) {
       flashEnemy(bossMesh);
       if (onWeakPoint) spawnDeathParticles(weakWorldPos.clone(), bd.emissive);
       spawnDamageNumber(bossMesh.position.clone().add(new THREE.Vector3(0, bd.size + 0.5, 0)), dmg, isCrit || onWeakPoint);
-      scene.remove(p); projectiles.splice(i, 1);
+      projectiles.splice(i, 1); releasePlayerProjectile(p);
     }
   }
   for (let i = fireballs.length - 1; i >= 0; i--) {
@@ -840,7 +841,7 @@ function updateHiveMotherBoss(delta) {
       bd.currentHp -= stats.attackDamage * 4 * dmgMult;
       flashEnemy(bossMesh);
       spawnDeathParticles(fireballs[i].position, 0xff4400);
-      scene.remove(fireballs[i]); fireballs.splice(i, 1);
+      removeAndDispose(fireballs[i]); fireballs.splice(i, 1);
     }
   }
 

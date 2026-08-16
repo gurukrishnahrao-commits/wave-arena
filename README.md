@@ -77,29 +77,20 @@ The current self-contained build is suitable for initial testing. A full launch 
 
 Prepare a dedicated Poki build with its SDK and event lifecycle. Keep all game assets and libraries local, support desktop/mobile/tablet, test a 16:9 viewport, and keep storage calls protected with `try/catch`. This project already wraps its `localStorage` access and now avoids external CDN requests.
 
-## Current game review
+## Current game features
 
-Strong foundation:
+- Immediate Pulse Rifle start with first-run playable movement, firing, kill, and pickup training.
+- A 25-wave campaign across six arena themes, ending in a final victory encounter.
+- Fixed milestone bosses: Sentinel (5), Hive Mother (10), Void Reaver (15), Aether Regent (20), and Sovereign Core (25).
+- Seven enemy archetypes, including telegraphed dashers, healing/shield support units, and splitters.
+- Primary and secondary weapons, passives, upgrades, between-wave shops, and checkpoint continues.
+- Permanent Core upgrades, weapon/passive unlocks, achievements, Operations, and lifetime statistics.
+- Adaptive procedural menu, combat, boss, and victory music with separate persisted music/SFX levels.
+- Low/auto/high graphics settings, optional screenshake, bounded particles, pooled projectiles and pickups, and disposal-aware cleanup for longer sessions.
+- Keyboard, mouse, and touch controls plus pause, mute, safe-area, and high-refresh-rate support.
+- Protected local saves and a small, self-contained build with no runtime network dependencies.
 
-- clear survivor-style core loop;
-- fast 20-second waves;
-- multiple primary/secondary weapons and passives;
-- shops and build choices between waves;
-- boss encounters and changing arena themes;
-- keyboard, mouse, and touch controls;
-- local save protection for privacy/incognito restrictions;
-- small self-contained download; and
-- pause, mute, safe-area, and high-refresh-rate support.
-
-Highest-value work before pitching to curated portals:
-
-1. Add a 10–20 second playable tutorial that teaches movement, aiming, coins, and upgrades visually.
-2. Add visible long-term goals: unlockable weapons, challenges, achievements, skins, and a reason to return.
-3. Improve the first five minutes with more enemy behaviors, stronger hit feedback, and an early mini-boss or surprise.
-4. Add settings for sound/music, graphics quality, screenshake, and reduced effects.
-5. Profile object creation and WebGL draw calls on low-end Android and 4 GB Chromebooks.
-6. Create polished static and animated thumbnails, screenshots, a short trailer, and platform-specific descriptions.
-7. Add a platform adapter and separate SDK builds only after choosing each portal's ad and save flow.
+Before a curated-portal release, complete cross-browser/device playthroughs, create the deferred branding and store media, and add a dedicated platform adapter/SDK build for each selected portal.
 
 ## Release checklist
 

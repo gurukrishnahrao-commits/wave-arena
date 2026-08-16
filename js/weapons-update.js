@@ -43,11 +43,14 @@ function updateFireballs(delta) {
     bp.mesh.material.opacity = bp.life / 2;
     for (const e of enemies) {
       if (new THREE.Vector3(bp.x, 0, bp.z).distanceTo(new THREE.Vector3(e.position.x, 0, e.position.z)) < 1.5) {
-        e.userData.hp -= stats.attackDamage * 0.5 * delta;
+        damageEnemy(e, stats.attackDamage * 0.5 * delta, false, { silentNumber: true });
       }
     }
+    if (bossActive && bossMesh && flatDist(bp.mesh.position, bossMesh.position) < 1.5) {
+      damageBossTarget(stats.attackDamage * 0.5 * delta, false, bossMesh.position, { silentNumber: true });
+    }
     if (bp.life <= 0) {
-      scene.remove(bp.mesh);
+      removeAndDispose(bp.mesh);
       burnPatches.splice(i, 1);
     }
   }
@@ -64,16 +67,16 @@ function updateFireballs(delta) {
     for (const e of enemies) {
       if (f.position.distanceTo(e.position) < 0.9) { exploded = true; break; }
     }
+    if (bossActive && bossMesh && flatDist(f.position, bossMesh.position) < (bossData.size || 2) * 0.65) exploded = true;
 
     if (exploded || f.userData.life <= 0) {
       if (exploded) {
         const splashDmg = Math.round(stats.attackDamage * 4);
         for (const e of enemies) {
-          if (f.position.distanceTo(e.position) < 3) {
-            e.userData.hp -= splashDmg;
-            flashEnemy(e);
-            spawnDamageNumber(e.position.clone().add(new THREE.Vector3(0, 1.2, 0)), splashDmg, false);
-          }
+          if (f.position.distanceTo(e.position) < 3) damageEnemy(e, splashDmg, false);
+        }
+        if (bossActive && bossMesh && flatDist(f.position, bossMesh.position) < 3 + (bossData.size || 1)) {
+          damageBossTarget(splashDmg, false, f.position);
         }
         spawnDeathParticles(f.position, 0xff4400);
         spawnDeathParticles(f.position, 0xffaa00);
@@ -92,7 +95,7 @@ function updateFireballs(delta) {
           burnPatches.push({ mesh: patch, x: f.position.x, z: f.position.z, life: 2 });
         }
       }
-      scene.remove(f);
+      removeAndDispose(f);
       fireballs.splice(i, 1);
     }
   }
@@ -113,19 +116,25 @@ function updateOrbitalBlades(delta) {
     blade.position.y = 0.7;
     blade.rotation.y = angle + Math.PI / 2;
 
+    const cd = blade.userData.hitCooldowns;
+    const now = performance.now();
     for (const e of enemies) {
-      const cd = blade.userData.hitCooldowns;
-      const now = performance.now();
       if (blade.position.distanceTo(e.position) < 1.0) {
         const lastHit = cd.get(e.uuid) || 0;
         if (now - lastHit > 400) {
           const dmg = Math.round(stats.attackDamage * 1.2);
-          e.userData.hp -= dmg;
-          flashEnemy(e);
-          spawnDamageNumber(e.position.clone().add(new THREE.Vector3(0, 1.2, 0)), dmg, false);
+          damageEnemy(e, dmg, false);
           cd.set(e.uuid, now);
           AudioManager.hit();
         }
+      }
+    }
+    if (bossActive && bossMesh && flatDist(blade.position, bossMesh.position) < (bossData.size || 1) * 0.7 + 0.6) {
+      const lastHit = cd.get('active-boss') || 0;
+      if (now - lastHit > 400) {
+        damageBossTarget(Math.round(stats.attackDamage * 1.2), false, blade.position);
+        cd.set('active-boss', now);
+        AudioManager.hit();
       }
     }
   }
@@ -137,7 +146,7 @@ function updateRailBeams(delta) {
     railBeams[i].life -= delta;
     railBeams[i].mesh.material.opacity = railBeams[i].life / 0.15;
     if (railBeams[i].life <= 0) {
-      scene.remove(railBeams[i].mesh);
+      removeAndDispose(railBeams[i].mesh);
       railBeams.splice(i, 1);
     }
   }
@@ -159,24 +168,24 @@ function updateRockets(delta) {
     for (const e of enemies) {
       if (r.position.distanceTo(e.position) < 1.0) { exploded = true; break; }
     }
+    if (bossActive && bossMesh && flatDist(r.position, bossMesh.position) < (bossData.size || 2) * 0.7) exploded = true;
 
     if (exploded || r.userData.life <= 0) {
       if (exploded) {
         const dmg = Math.round(stats.attackDamage * 6);
         const radius = boosted ? 6.4 : 4;
         for (const e of enemies) {
-          if (r.position.distanceTo(e.position) < radius) {
-            e.userData.hp -= dmg;
-            flashEnemy(e);
-            spawnDamageNumber(e.position.clone().add(new THREE.Vector3(0, 1.2, 0)), dmg, false);
-          }
+          if (r.position.distanceTo(e.position) < radius) damageEnemy(e, dmg, false);
+        }
+        if (bossActive && bossMesh && flatDist(r.position, bossMesh.position) < radius + (bossData.size || 1)) {
+          damageBossTarget(dmg, false, r.position);
         }
         spawnDeathParticles(r.position, 0xffa500);
         spawnDeathParticles(r.position, 0xff4400);
         triggerScreenShake(0.35);
         AudioManager.explosion();
       }
-      scene.remove(r);
+      removeAndDispose(r);
       rockets.splice(i, 1);
     }
   }
@@ -222,9 +231,7 @@ function updatePlasmaBeam(delta) {
   if (plasmaTickTimer <= 0) {
     const isCrit = Math.random() < stats.critChance;
     const dmg = Math.round((isCrit ? stats.attackDamage * 1.5 : stats.attackDamage) * (boosted ? 0.75 : 0.5));
-    enemy.userData.hp -= dmg;
-    flashEnemy(enemy);
-    spawnDamageNumber(enemy.position.clone().add(new THREE.Vector3(0, 1.2, 0)), dmg, isCrit);
+    damageTarget(enemy, dmg, isCrit);
     if (isCrit) AudioManager.critHit();
     plasmaTickTimer = 0.15;
   }

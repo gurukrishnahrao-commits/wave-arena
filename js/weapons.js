@@ -70,6 +70,13 @@ function equippedWeapons() {
     .filter(Boolean);
 }
 
+function damageTarget(target, amount, isCrit = false, options = {}) {
+  if (target === bossMesh && bossActive && bossData) {
+    return damageBossTarget(amount, isCrit, target.position, options);
+  }
+  return damageEnemy(target, amount, isCrit, options);
+}
+
 // ---- PULSE RIFLE ----
 function fireWeaponPulse() {
   const target = { position: player.position.clone().addScaledVector(aimDir, 1) };
@@ -100,9 +107,7 @@ function fireWeaponSniper() {
   const boosted = w?.upgrade.applied;
   const isCrit = Math.random() < stats.critChance;
   const dmg = Math.round(stats.attackDamage * (isCrit ? 6 : 4) * (boosted ? 1.5 : 1));
-  enemy.userData.hp -= dmg;
-  flashEnemy(enemy);
-  spawnDamageNumber(enemy.position.clone().add(new THREE.Vector3(0, 1.2, 0)), dmg, isCrit);
+  damageTarget(enemy, dmg, isCrit);
   if (isCrit) { triggerScreenShake(0.15); AudioManager.critHit(); }
   else { AudioManager.hit(); }
 
@@ -159,7 +164,7 @@ function fireWeaponPlasma() {
 // ---- ORBITAL BLADES ----
 function fireWeaponOrbital() {
   // Remove existing blades first to prevent duplicates
-  orbitalBlades.forEach(b => scene.remove(b));
+  orbitalBlades.forEach(removeAndDispose);
   orbitalBlades.length = 0;
 
   for (let i = 0; i < 3; i++) {

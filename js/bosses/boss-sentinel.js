@@ -129,8 +129,8 @@ function spawnSentinelIntro(def) {
     }, () => {
       if (introId !== sentinelIntroId) return;
       if (bossData) bossData.introRising = false;
-      if (portal) { scene.remove(portal); portal = null; }
-      if (glow) { scene.remove(glow); glow = null; }
+      if (portal) { removeAndDispose(portal); portal = null; }
+      if (glow) { removeAndDispose(glow); glow = null; }
     });
   }, 1700);
 
@@ -186,7 +186,7 @@ function updateSentinelBoss(delta) {
   // Shield at 70%
   if (!bd.shieldTriggered && bd.currentHp <= bd.hp * 0.7) {
     bd.shieldTriggered = true;
-    if (bd.activeAttack) { scene.remove(bd.activeAttack.mesh); bd.activeAttack = null; }
+    if (bd.activeAttack) { removeAndDispose(bd.activeAttack.mesh); bd.activeAttack = null; }
     activateSentinelShield();
   }
 
@@ -225,7 +225,7 @@ function updateSentinelBoss(delta) {
         const sf = document.getElementById('boss-shield-fill');
         if (sf) sf.style.width = Math.max(0, (bd.shieldHp / bd.maxShieldHp) * 100) + '%';
         flashBossHit(bd, mesh.position.clone().add(new THREE.Vector3(0, bd.size * 0.15, 0)));
-        scene.remove(p); projectiles.splice(i, 1);
+        projectiles.splice(i, 1); releasePlayerProjectile(p);
       }
     }
     for (let i = fireballs.length - 1; i >= 0; i--) {
@@ -235,14 +235,14 @@ function updateSentinelBoss(delta) {
         if (sf2) sf2.style.width = Math.max(0, (bd.shieldHp / bd.maxShieldHp) * 100) + '%';
         flashBossHit(bd, mesh.position.clone().add(new THREE.Vector3(0, bd.size * 0.15, 0)));
         spawnDeathParticles(fireballs[i].position, 0xff4400);
-        scene.remove(fireballs[i]); fireballs.splice(i, 1);
+        removeAndDispose(fireballs[i]); fireballs.splice(i, 1);
       }
     }
     if (bd.shieldHp <= 0 && bd.shieldActive) breakSentinelShield();
   }
 
   if (bd.currentHp <= 0) {
-    if (bd.activeAttack) { scene.remove(bd.activeAttack.mesh); bd.activeAttack = null; }
+    if (bd.activeAttack) { removeAndDispose(bd.activeAttack.mesh); bd.activeAttack = null; }
     killBoss();
   }
 }
@@ -261,11 +261,12 @@ function updateSentinelStun(delta) {
 
 function updateSentinelLightning(delta) {
   const bd = bossData;
+  const sourceMesh = bossMesh;
   bd.lightningTimer = (bd.lightningTimer ?? 1.2) - delta;
   if (bd.lightningTimer <= 0) {
     for (let i = 0; i < 2; i++) {
       setTimeout(() => {
-        if (!bossMesh || !bossData || !bossData.enraged) return;
+        if (bossMesh !== sourceMesh || bossData !== bd || !bd.enraged) return;
         const off = new THREE.Vector3((Math.random() - 0.5) * bd.size * 1.6, Math.random() * bd.size, (Math.random() - 0.5) * bd.size * 1.6);
         spawnDeathParticles(bossMesh.position.clone().add(off), 0x8844ff);
       }, i * 90);
@@ -277,6 +278,7 @@ function updateSentinelLightning(delta) {
 
 function activateSentinelShield() {
   const bd = bossData;
+  const sourceMesh = bossMesh;
   bd.shieldActive = true;
   bd.shieldHp = bd.hp * 0.6;
   bd.maxShieldHp = bd.shieldHp;
@@ -295,8 +297,8 @@ function activateSentinelShield() {
 
   positions.forEach((pos, i) => {
     setTimeout(() => {
-      if (!bossMesh || !bossData) return;
-      const worldPos = bossMesh.position.clone().add(new THREE.Vector3(pos[0], pos[1], pos[2]));
+      if (bossMesh !== sourceMesh || bossData !== bd) return;
+      const worldPos = sourceMesh.position.clone().add(new THREE.Vector3(pos[0], pos[1], pos[2]));
       spawnDeathParticles(worldPos, 0x66ccff);
       triggerScreenShake(0.15);
 
@@ -308,22 +310,26 @@ function activateSentinelShield() {
       const gm = new THREE.Mesh(geo, mat);
       gm.position.set(pos[0], pos[1], pos[2]);
       gm.scale.set(0.01, 0.01, 0.01);
-      bossMesh.add(gm);
+      sourceMesh.add(gm);
 
       const entry = { mesh: gm, hp: 60, maxHp: 60, destroyed: false, spawning: true };
       bd.generators.push(entry);
 
       tweenValue(0.45, t => {
+        if (bossMesh !== sourceMesh || bossData !== bd) return;
         const e = 1 - Math.pow(1 - t, 3);
         const s = 0.05 + 0.95 * Math.min(1.15, e * 1.15);
         gm.scale.set(s, s, s);
       }, () => {
+        if (bossMesh !== sourceMesh || bossData !== bd) return;
         gm.scale.set(1, 1, 1);
         entry.spawning = false;
         if (bd.generators.length === 4 && bd.generators.every(g => !g.spawning)) {
           triggerScreenShake(0.4);
           flashCenterMsg('SHIELD ACTIVATED — DESTROY GENERATORS', '#66ccff');
-          tweenValue(0.5, t => { if (bd.shieldMesh) bd.shieldMesh.material.opacity = 0.35 * t; });
+          tweenValue(0.5, t => {
+            if (bossMesh === sourceMesh && bossData === bd && bd.shieldMesh) bd.shieldMesh.material.opacity = 0.35 * t;
+          });
         }
       });
     }, i * 220);
@@ -352,7 +358,7 @@ function updateSentinelGenerators(delta) {
         g.hp -= dmg;
         flashEnemy(g.mesh);
         spawnDamageNumber(worldPos.clone().add(new THREE.Vector3(0, 0.5, 0)), dmg, isCrit);
-        scene.remove(p); projectiles.splice(i, 1);
+        projectiles.splice(i, 1); releasePlayerProjectile(p);
       }
     }
     for (let i = fireballs.length - 1; i >= 0; i--) {
@@ -360,14 +366,14 @@ function updateSentinelGenerators(delta) {
         g.hp -= stats.attackDamage * 4;
         flashEnemy(g.mesh);
         spawnDeathParticles(fireballs[i].position, 0xff4400);
-        scene.remove(fireballs[i]); fireballs.splice(i, 1);
+        removeAndDispose(fireballs[i]); fireballs.splice(i, 1);
       }
     }
 
     if (g.hp <= 0) {
       g.destroyed = true;
       spawnDeathParticles(worldPos, 0x66ccff);
-      bossMesh.remove(g.mesh);
+      removeAndDispose(g.mesh);
       triggerScreenShake(0.25);
     }
   });
@@ -389,7 +395,7 @@ function breakSentinelShield() {
       g.destroyed = true;
       const worldPos = g.mesh.getWorldPosition(new THREE.Vector3());
       spawnDeathParticles(worldPos, 0x66ccff);
-      bossMesh.remove(g.mesh);
+      removeAndDispose(g.mesh);
     }
   });
   bd.stunned = true;
@@ -420,7 +426,7 @@ function updateSentinelAttacks(delta) {
       }
     } else if (atk.state === 'firing') {
       if (atk.timer <= 0) {
-        scene.remove(atk.mesh);
+        removeAndDispose(atk.mesh);
         bd.activeAttack = null;
         bd.attackTimer = sentinelCooldown(bd, 2.0, 1.4, 1.0);
       }
@@ -450,6 +456,7 @@ function sentinelCooldown(bd, base, phase2Val, enragedVal) {
 
 function fireSentinelPlasmaBurst() {
   const bd = bossData;
+  const sourceMesh = bossMesh;
   const volleys = bd.enraged ? 2 : 1;
   const baseDir = new THREE.Vector3().subVectors(player.position, bossMesh.position);
   baseDir.y = 0; baseDir.normalize();
@@ -457,10 +464,10 @@ function fireSentinelPlasmaBurst() {
 
   for (let v = 0; v < volleys; v++) {
     setTimeout(() => {
-      if (!bossActive || !bossMesh) return;
+      if (!bossActive || bossMesh !== sourceMesh || bossData !== bd) return;
       spreadAngles.forEach(a => {
         const dir = baseDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), a);
-        spawnEnemyProjectile(bossMesh.position.clone(), dir, { speed: 0.16, damage: 14, color: 0xaa44ff });
+        spawnEnemyProjectile(sourceMesh.position.clone(), dir, { speed: 0.16, damage: 14, color: 0xaa44ff });
       });
     }, v * 220);
   }

@@ -18,7 +18,7 @@ function updateGraphics(delta) {
     t.mesh.material.opacity = ratio * 0.45;
     t.mesh.scale.setScalar(0.3 + ratio * 0.7);
     if (t.life <= 0) {
-      scene.remove(t.mesh);
+      removeAndDispose(t.mesh);
       playerTrail.splice(i, 1);
     }
   }

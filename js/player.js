@@ -138,7 +138,8 @@ function updatePlayer(delta) {
   }
 
   // Trail
-  const trailChance = 1 - Math.pow(1 - 0.6, step);
+  const trailDensity = getGameSettings().quality === 'low' ? 0.22 : 0.6;
+  const trailChance = 1 - Math.pow(1 - trailDensity, step);
   if ((dx !== 0 || dz !== 0) && Math.random() < trailChance) {
     const tGeo = new THREE.SphereGeometry(0.15 + Math.random() * 0.1, 5, 4);
     const tMat = new THREE.MeshBasicMaterial({ color: 0x3dffd2, transparent: true, opacity: 0.5 });
@@ -147,16 +148,19 @@ function updatePlayer(delta) {
     tMesh.position.y = 0.4;
     scene.add(tMesh);
     playerTrail.push({ mesh: tMesh, life: 0.35, maxLife: 0.35 });
-    if (playerTrail.length > CONFIG.TRAIL_LENGTH) {
+    const trailLimit = getGameSettings().quality === 'low' ? 6 : CONFIG.TRAIL_LENGTH;
+    if (playerTrail.length > trailLimit) {
       const old = playerTrail.shift();
-      scene.remove(old.mesh);
+      removeAndDispose(old.mesh);
     }
   }
 }
 
 function findEnemyInCone(maxDist, halfAngle) {
   let nearest = null, minDist = Infinity;
-  for (const e of enemies) {
+  const candidates = enemies.slice();
+  if (bossActive && bossMesh && bossData && !bossData.introRising) candidates.push(bossMesh);
+  for (const e of candidates) {
     const toE = new THREE.Vector3().subVectors(e.position, player.position);
     toE.y = 0;
     const d = toE.length();

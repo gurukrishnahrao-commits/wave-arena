@@ -90,14 +90,16 @@ function renderUpgradesTab(container) {
 
 function renderWeaponsTab(container) {
   WEAPONS.forEach(w => {
+    const unlocked = isWeaponUnlocked(w.id);
     const isEquipped = loadout.primary === w.id || loadout.secondary === w.id;
     const slotFull = w.slot === 'primary' ? !!loadout.primary : !!loadout.secondary;
-    const canBuy = !isEquipped && !slotFull;
+    const canBuy = unlocked && !isEquipped && !slotFull;
 
     const card = document.createElement('div');
-    card.className = 'shop-card' + (isEquipped ? ' owned' : !canBuy ? ' cant-afford' : '');
+    card.className = 'shop-card' + (!unlocked ? ' locked' : '') + (isEquipped ? ' owned' : !canBuy ? ' cant-afford' : '');
 
-    if (isEquipped) card.innerHTML += `<div class="card-badge badge-owned">${w.slot.toUpperCase()}</div>`;
+    if (!unlocked) card.innerHTML += `<div class="card-badge badge-locked">LOCKED</div>`;
+    else if (isEquipped) card.innerHTML += `<div class="card-badge badge-owned">${w.slot.toUpperCase()}</div>`;
     else if (!canBuy) card.innerHTML += `<div class="card-badge" style="background:#222;color:#555">SLOT FULL</div>`;
 
     card.innerHTML += `
@@ -112,7 +114,7 @@ function renderWeaponsTab(container) {
       </div>
       ${isEquipped && !w.upgrade.applied ? `<div class="card-cost affordable" style="font-size:11px; margin-top:4px; cursor:pointer;" id="upgrade-${w.id}">🔧 UPGRADE: ${w.upgrade.name} (💰${Math.round(30 * Math.pow(1.5, waveNumber * 0.3))})</div>` : ''}
       ${isEquipped && w.upgrade.applied ? `<div class="card-cost free" style="font-size:11px; margin-top:4px;">✓ ${w.upgrade.name}</div>` : ''}
-      ${!isEquipped ? `<div class="card-cost ${canBuy ? 'free' : 'expensive'}">${canBuy ? '+ EQUIP FREE' : '—'}</div>` : ''}
+      ${!isEquipped ? `<div class="card-cost ${canBuy ? 'free' : 'expensive'}">${!unlocked ? `🔒 ${weaponUnlockText(w.id)}` : canBuy ? '+ EQUIP FREE' : '—'}</div>` : ''}
     `;
 
     if (!isEquipped && canBuy) {
@@ -155,14 +157,16 @@ function renderWeaponsTab(container) {
 
 function renderPassivesTab(container) {
   PASSIVES.forEach(p => {
+    const unlocked = isPassiveUnlocked(p.id);
     const isEquipped = loadout.passive === p.id;
     const slotFull = !!loadout.passive && !isEquipped;
-    const canEquip = !isEquipped && !slotFull;
+    const canEquip = unlocked && !isEquipped && !slotFull;
 
     const card = document.createElement('div');
-    card.className = 'shop-card' + (isEquipped ? ' owned' : slotFull ? ' cant-afford' : '');
+    card.className = 'shop-card' + (!unlocked ? ' locked' : '') + (isEquipped ? ' owned' : !canEquip ? ' cant-afford' : '');
 
-    if (isEquipped) card.innerHTML += `<div class="card-badge badge-owned">ACTIVE</div>`;
+    if (!unlocked) card.innerHTML += `<div class="card-badge badge-locked">LOCKED</div>`;
+    else if (isEquipped) card.innerHTML += `<div class="card-badge badge-owned">ACTIVE</div>`;
     else if (slotFull) card.innerHTML += `<div class="card-badge" style="background:#222;color:#555">SLOT FULL</div>`;
 
     card.innerHTML += `
@@ -170,7 +174,7 @@ function renderPassivesTab(container) {
       <div class="card-name">${p.name}</div>
       <div class="card-desc">${p.desc}</div>
       <div class="card-cost ${canEquip ? 'free' : isEquipped ? 'free' : 'expensive'}">
-        ${isEquipped ? '✓ ACTIVE' : canEquip ? '+ EQUIP FREE' : '—'}
+        ${!unlocked ? `🔒 ${passiveUnlockText(p.id)}` : isEquipped ? '✓ ACTIVE' : canEquip ? '+ EQUIP FREE' : '—'}
       </div>
     `;
 
@@ -209,6 +213,7 @@ function setupContinueButton() {
     screen.classList.remove('shop-visible');
     screen.style.display = 'none';
     gameState = 'playing';
+    AudioManager.setMusicMode(isBossWave(waveNumber) ? 'boss' : 'combat');
     invincibleTimer = CONFIG.INVINCIBLE_DURATION;
     blinkTimer = 0;
     waveTimer = 0; // ADD THIS - reset for new wave
@@ -226,7 +231,7 @@ function destroyPreviews() {
   previewRenderers = [];
 }
 
-function showWeaponSelectScreen(slot, onPick) {
+function showWeaponSelectScreen(slot, onPick, allowSkip = true) {
   destroyPreviews();
   const screen = document.getElementById('weapon-select-screen');
   screen.style.display = 'flex';
@@ -238,7 +243,7 @@ function showWeaponSelectScreen(slot, onPick) {
     : 'SUPPORT YOUR BUILD WITH A SECONDARY';
 
   const available = WEAPONS.filter(w =>
-    w.slot === slot && w.id !== loadout.primary && w.id !== loadout.secondary
+    w.slot === slot && isWeaponUnlocked(w.id) && w.id !== loadout.primary && w.id !== loadout.secondary
   );
 
   const container = document.getElementById('ws-cards');
@@ -282,8 +287,8 @@ function showWeaponSelectScreen(slot, onPick) {
     requestAnimationFrame(() => buildWeaponPreview(canvas, w.id));
   });
 
-  // Skip button for secondary
-  if (!isPrimary) {
+  // Optional skip for secondary selection flows
+  if (!isPrimary && allowSkip) {
     const skipCard = document.createElement('div');
     skipCard.className = 'ws-card';
     skipCard.style.opacity = '0.6';

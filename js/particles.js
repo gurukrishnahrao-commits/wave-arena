@@ -1,16 +1,20 @@
 // ============================================
-// PARTICLES — death effects, ring flashes
+// PARTICLES — bounded effects with disposal
 // ============================================
 
 function spawnDeathParticles(pos, color) {
-  const count = CONFIG.PARTICLES.DEATH_COUNT_MIN +
+  const quality = getGameSettings().quality;
+  const baseCount = CONFIG.PARTICLES.DEATH_COUNT_MIN +
     Math.floor(Math.random() * (CONFIG.PARTICLES.DEATH_COUNT_MAX - CONFIG.PARTICLES.DEATH_COUNT_MIN));
+  const count = quality === 'low' ? Math.ceil(baseCount * 0.45) : baseCount;
+  trimParticleBudget(count + 1);
+
   for (let i = 0; i < count; i++) {
     const s = 0.08 + Math.random() * 0.2;
     const geo = Math.random() > 0.5
       ? new THREE.BoxGeometry(s, s, s)
       : new THREE.TetrahedronGeometry(s * 0.8, 0);
-    const mat = new THREE.MeshBasicMaterial({ color });
+    const mat = new THREE.MeshBasicMaterial({ color, transparent: true });
     const part = new THREE.Mesh(geo, mat);
     part.position.copy(pos);
     const angle = Math.random() * Math.PI * 2;
@@ -26,8 +30,7 @@ function spawnDeathParticles(pos, color) {
     particles.push(part);
   }
 
-  // Ring flash
-  const ringGeo = new THREE.RingGeometry(0.1, 0.4, 24);
+  const ringGeo = new THREE.RingGeometry(0.1, 0.4, quality === 'low' ? 12 : 24);
   const ringMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
   const ring = new THREE.Mesh(ringGeo, ringMat);
   ring.rotation.x = -Math.PI / 2;
@@ -39,6 +42,7 @@ function spawnDeathParticles(pos, color) {
 }
 
 function updateParticles(delta) {
+  trimParticleBudget(0);
   const step = frameScale(delta);
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
@@ -46,10 +50,10 @@ function updateParticles(delta) {
 
     if (p.userData.expand) {
       const t = 1 - p.userData.life / p.userData.maxLife;
-      const scale = 1 + t * 5;
-      p.scale.set(scale, scale, scale);
+      const scale = (p.userData.baseScale || 1) * (1 + t * 5);
+      p.scale.setScalar(scale);
       p.material.opacity = Math.max(0, p.userData.life / p.userData.maxLife * 0.9);
-    } else {
+    } else if (p.userData.vel) {
       p.position.addScaledVector(p.userData.vel, step);
       p.userData.vel.y -= 0.006 * step;
       p.material.opacity = Math.max(0, p.userData.life / (p.userData.maxLife || 0.6));
@@ -59,7 +63,7 @@ function updateParticles(delta) {
     }
 
     if (p.userData.life <= 0) {
-      scene.remove(p);
+      removeAndDispose(p);
       particles.splice(i, 1);
     }
   }
