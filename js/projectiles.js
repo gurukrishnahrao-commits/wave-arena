@@ -35,10 +35,11 @@ function fireProjectileInDir(dir, opts = {}) {
 }
 
 function updateProjectiles(delta) {
+  const step = frameScale(delta);
   for (let i = projectiles.length - 1; i >= 0; i--) {
     const p = projectiles[i];
-    p.position.x += p.userData.dir.x * p.userData.speed;
-    p.position.z += p.userData.dir.z * p.userData.speed;
+    p.position.x += p.userData.dir.x * p.userData.speed * step;
+    p.position.z += p.userData.dir.z * p.userData.speed * step;
     p.userData.life -= delta;
 
     let hit = false;
@@ -75,10 +76,11 @@ function spawnEnemyProjectile(from, dir, opts = {}) {
 }
 
 function updateEnemyProjectiles(delta) {
+  const step = frameScale(delta);
   for (let i = enemyProjectiles.length - 1; i >= 0; i--) {
     const p = enemyProjectiles[i];
-    p.position.x += p.userData.dir.x * p.userData.speed;
-    p.position.z += p.userData.dir.z * p.userData.speed;
+    p.position.x += p.userData.dir.x * p.userData.speed * step;
+    p.position.z += p.userData.dir.z * p.userData.speed * step;
     p.userData.life -= delta;
     if (p.position.distanceTo(player.position) < 0.5) {
       if (invincibleTimer <= 0) {

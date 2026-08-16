@@ -2,6 +2,8 @@
 // MAIN — entry point, game loop, game over
 // ============================================
 
+let loadingHideTimer = null;
+
 function init() {
   loadMeta();
   AudioManager.init();
@@ -9,9 +11,49 @@ function init() {
   initPlayer();
   setupInput();
   setupMobileControls();
+  setupQuickControls();
 
   updateLoadingBar(100);
-  setTimeout(hideLoadingScreen, 500);
+  loadingHideTimer = setTimeout(hideLoadingScreen, 500);
+}
+
+function setupQuickControls() {
+  const pauseBtn = document.getElementById('pause-btn');
+  const resumeBtn = document.getElementById('resume-btn');
+  const muteBtn = document.getElementById('mute-btn');
+
+  pauseBtn.onclick = () => pauseGame();
+  resumeBtn.onclick = () => resumeGame();
+  muteBtn.onclick = () => {
+    const muted = AudioManager.toggleMute();
+    muteBtn.textContent = muted ? '🔇' : '🔊';
+    muteBtn.setAttribute('aria-pressed', String(muted));
+    muteBtn.setAttribute('aria-label', muted ? 'Unmute sound' : 'Mute sound');
+    muteBtn.title = muted ? 'Unmute sound' : 'Mute sound';
+  };
+}
+
+function pauseGame() {
+  if (gameState !== 'playing') return;
+  gameState = 'paused';
+  clearActiveInput();
+  document.getElementById('pause-screen').style.display = 'flex';
+  document.getElementById('pause-btn').setAttribute('aria-pressed', 'true');
+  document.getElementById('resume-btn').focus();
+}
+
+function resumeGame() {
+  if (gameState !== 'paused') return;
+  document.getElementById('pause-screen').style.display = 'none';
+  document.getElementById('pause-btn').setAttribute('aria-pressed', 'false');
+  gameState = 'playing';
+  AudioManager.resume();
+  clock.getDelta();
+}
+
+function togglePause() {
+  if (gameState === 'paused') resumeGame();
+  else pauseGame();
 }
 
 function gameOver() {
@@ -24,6 +66,8 @@ function gameOver() {
   hiveIntroId++;
   centerMsgGen++;
   saveMeta();
+  document.getElementById('pause-screen').style.display = 'none';
+  document.getElementById('pause-btn').setAttribute('aria-pressed', 'false');
 
   if (bossActive) cleanupBoss();
   if (ambientLight) ambientLight.intensity = 0.8;
@@ -108,6 +152,12 @@ function animate() {
   const rawDelta = Math.min(clock.getDelta(), 0.1);
   const delta = rawDelta * timeScale;
 
+  // Keep rendering the modal while freezing every gameplay and visual timer.
+  if (gameState === 'paused') {
+    renderer.render(scene, camera);
+    return;
+  }
+
   // Muzzle flash fade
   if (muzzleTimer > 0) {
     muzzleTimer -= delta;
@@ -115,7 +165,7 @@ function animate() {
   }
 
   // Shake decay
-  shakeAmount *= 0.82;
+  shakeAmount *= Math.pow(0.82, frameScale(delta));
   if (shakeAmount < 0.001) shakeAmount = 0;
 
   // Red flash decay
@@ -158,6 +208,7 @@ document.getElementById('start-btn').onclick = () => {
   AudioManager.resume();
   document.getElementById('start-screen').style.display = 'none';
   document.getElementById('hud').style.display = 'flex';
+  document.getElementById('quick-controls').style.display = 'flex';
 
   showWeaponSelectScreen('primary', (primaryId) => {
     loadout.primary = primaryId;
@@ -177,5 +228,19 @@ document.getElementById('start-btn').onclick = () => {
 };
 
 // ---- BOOT ----
-init();
-animate();
+try {
+  init();
+  animate();
+} catch (error) {
+  clearTimeout(loadingHideTimer);
+  console.error('Wave Arena failed to start:', error);
+  const loading = document.getElementById('loading-screen');
+  loading.classList.remove('hidden');
+  loading.style.display = 'flex';
+  loading.querySelector('.loading-content').innerHTML = `
+    <h1>WAVE ARENA</h1>
+    <p style="max-width:420px;color:#ff9ab0;line-height:1.6;">
+      The arena could not start. Please enable WebGL, refresh the page, or try a current browser.
+    </p>
+  `;
+}

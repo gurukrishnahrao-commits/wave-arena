@@ -8,7 +8,7 @@ function updateCamera(delta) {
 
   if (!camera.userData.basePos) camera.userData.basePos = camera.position.clone();
   const base = camera.userData.basePos;
-  base.lerp(targetPos, CONFIG.CAMERA.LERP_SPEED);
+  base.lerp(targetPos, frameLerp(CONFIG.CAMERA.LERP_SPEED, delta));
   camera.position.copy(base);
 
   camera.lookAt(player.position.x, 0.5, player.position.z);

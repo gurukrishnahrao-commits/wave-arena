@@ -2,6 +2,16 @@
 // UTILITY FUNCTIONS
 // ============================================
 
+// Convert per-frame values (authored for 60 FPS) into time-based values.
+// This keeps movement and animation speed consistent on 30/60/120 Hz screens.
+function frameScale(delta) {
+  return Math.min(delta * 60, 6);
+}
+
+function frameLerp(amountAt60Fps, delta) {
+  return 1 - Math.pow(1 - amountAt60Fps, frameScale(delta));
+}
+
 // Horizontal-only distance (ignores Y)
 function flatDist(a, b) {
   return Math.hypot(a.x - b.x, a.z - b.z);

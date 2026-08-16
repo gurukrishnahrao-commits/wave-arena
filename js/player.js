@@ -86,6 +86,7 @@ function initPlayer() {
 }
 
 function updatePlayer(delta) {
+  const step = frameScale(delta);
   let dx = 0, dz = 0;
   if (keys['w'] || keys['arrowup']) dz -= 1;
   if (keys['s'] || keys['arrowdown']) dz += 1;
@@ -100,8 +101,8 @@ function updatePlayer(delta) {
   if (dx !== 0 || dz !== 0) {
     const len = Math.sqrt(dx * dx + dz * dz);
     if (len > 1) { dx /= len; dz /= len; }
-    player.position.x += dx * stats.speed;
-    player.position.z += dz * stats.speed;
+    player.position.x += dx * stats.speed * step;
+    player.position.z += dz * stats.speed * step;
     if (isTouchDevice) player.rotation.y = Math.atan2(dx, dz);
 
     clampToArena(player.position);
@@ -137,7 +138,8 @@ function updatePlayer(delta) {
   }
 
   // Trail
-  if ((dx !== 0 || dz !== 0) && Math.random() < 0.6) {
+  const trailChance = 1 - Math.pow(1 - 0.6, step);
+  if ((dx !== 0 || dz !== 0) && Math.random() < trailChance) {
     const tGeo = new THREE.SphereGeometry(0.15 + Math.random() * 0.1, 5, 4);
     const tMat = new THREE.MeshBasicMaterial({ color: 0x3dffd2, transparent: true, opacity: 0.5 });
     const tMesh = new THREE.Mesh(tGeo, tMat);

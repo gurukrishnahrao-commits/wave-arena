@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0a0612">
+  <meta name="description" content="Survive escalating enemy waves, build a loadout, and defeat arena bosses.">
   <title>Wave Arena</title>
   <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -55,6 +57,20 @@
 
   <div id="center-msg"></div>
 
+  <div id="quick-controls" aria-label="Game controls">
+    <button id="pause-btn" type="button" aria-label="Pause game" title="Pause (Esc, P, or Space)">Ⅱ</button>
+    <button id="mute-btn" type="button" aria-label="Mute sound" title="Mute sound">🔊</button>
+  </div>
+
+  <div id="pause-screen" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+    <div class="pause-panel">
+      <div class="pause-kicker">RUN SUSPENDED</div>
+      <h2 id="pause-title">PAUSED</h2>
+      <p>Press Esc, P, Space, or the button below to return to the arena.</p>
+      <button id="resume-btn" type="button">RESUME</button>
+    </div>
+  </div>
+
   <div id="boss-bar" style="display:none;">
     <div id="boss-shield-bar" style="display:none;">
       <div id="boss-shield-fill"></div>
@@ -99,7 +115,8 @@
     </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Keep engine code local: game portals may block third-party CDN requests. -->
+  <script src="js/vendor/three.min.js"></script>
 
   <script src="js/config.js"></script>
   <script src="js/utils.js"></script>

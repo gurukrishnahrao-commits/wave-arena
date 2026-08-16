@@ -35,6 +35,7 @@ function updateWeapons(delta) {
 
 // ---- FIREBALL UPDATE ----
 function updateFireballs(delta) {
+  const step = frameScale(delta);
   // Burn patches
   for (let i = burnPatches.length - 1; i >= 0; i--) {
     const bp = burnPatches[i];
@@ -54,8 +55,8 @@ function updateFireballs(delta) {
   // Fireballs
   for (let i = fireballs.length - 1; i >= 0; i--) {
     const f = fireballs[i];
-    f.position.x += f.userData.dir.x * f.userData.speed;
-    f.position.z += f.userData.dir.z * f.userData.speed;
+    f.position.x += f.userData.dir.x * f.userData.speed * step;
+    f.position.z += f.userData.dir.z * f.userData.speed * step;
     f.rotation.y += delta * 4;
     f.userData.life -= delta;
 
@@ -144,13 +145,14 @@ function updateRailBeams(delta) {
 
 // ---- ROCKETS UPDATE ----
 function updateRockets(delta) {
+  const step = frameScale(delta);
   const w = getWeapon('rocket');
   const boosted = w?.upgrade.applied;
 
   for (let i = rockets.length - 1; i >= 0; i--) {
     const r = rockets[i];
-    r.position.x += r.userData.dir.x * r.userData.speed;
-    r.position.z += r.userData.dir.z * r.userData.speed;
+    r.position.x += r.userData.dir.x * r.userData.speed * step;
+    r.position.z += r.userData.dir.z * r.userData.speed * step;
     r.userData.life -= delta;
 
     let exploded = false;

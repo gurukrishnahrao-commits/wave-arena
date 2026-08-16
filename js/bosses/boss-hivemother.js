@@ -750,6 +750,7 @@ function updateHiveShockwaves(bd, delta) {
 
 function updateHiveMotherBoss(delta) {
   if (!bossMesh || !bossData) return;
+  const step = frameScale(delta);
   const bd = bossData;
   bd.bobT += delta;
 
@@ -768,8 +769,8 @@ function updateHiveMotherBoss(delta) {
     const dist = toPlayer.length();
     const dir = toPlayer.clone().normalize();
     if (dist > 4) {
-      bossMesh.position.x += dir.x * bd.speed;
-      bossMesh.position.z += dir.z * bd.speed;
+      bossMesh.position.x += dir.x * bd.speed * step;
+      bossMesh.position.z += dir.z * bd.speed * step;
       bd.__moving = true;
     } else {
       bd.__moving = false;

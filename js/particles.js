@@ -39,6 +39,7 @@ function spawnDeathParticles(pos, color) {
 }
 
 function updateParticles(delta) {
+  const step = frameScale(delta);
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.userData.life -= delta;
@@ -49,12 +50,12 @@ function updateParticles(delta) {
       p.scale.set(scale, scale, scale);
       p.material.opacity = Math.max(0, p.userData.life / p.userData.maxLife * 0.9);
     } else {
-      p.position.add(p.userData.vel);
-      p.userData.vel.y -= 0.006;
+      p.position.addScaledVector(p.userData.vel, step);
+      p.userData.vel.y -= 0.006 * step;
       p.material.opacity = Math.max(0, p.userData.life / (p.userData.maxLife || 0.6));
       p.material.transparent = true;
-      p.rotation.x += 0.15;
-      p.rotation.z += 0.1;
+      p.rotation.x += 0.15 * step;
+      p.rotation.z += 0.1 * step;
     }
 
     if (p.userData.life <= 0) {

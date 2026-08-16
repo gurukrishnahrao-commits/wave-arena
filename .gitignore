@@ -1,0 +1,9 @@
+# Generated upload packages
+release/
+
+# Local tooling
+__pycache__/
+*.py[cod]
+.DS_Store
+Thumbs.db
+*.log

@@ -27,7 +27,7 @@ function updateGraphics(delta) {
   if (combatLight) {
     combatLight.position.x = player.position.x;
     combatLight.position.z = player.position.z;
-    combatLightIntensity *= 0.9;
+    combatLightIntensity *= Math.pow(0.9, frameScale(delta));
     combatLight.intensity = combatLightIntensity;
   }
 

@@ -169,8 +169,9 @@ function updateSentinelBoss(delta) {
     bd.orbitAngle += delta * bd.orbitSpeed * (bd.enraged ? 1.5 : 1);
     const targetX = player.position.x + Math.cos(bd.orbitAngle) * bd.orbitRadius;
     const targetZ = player.position.z + Math.sin(bd.orbitAngle) * bd.orbitRadius;
-    mesh.position.x += (targetX - mesh.position.x) * 0.025;
-    mesh.position.z += (targetZ - mesh.position.z) * 0.025;
+    const follow = frameLerp(0.025, delta);
+    mesh.position.x += (targetX - mesh.position.x) * follow;
+    mesh.position.z += (targetZ - mesh.position.z) * follow;
   }
   bd.floatT += delta;
   mesh.position.y = bd.baseY + Math.sin(bd.floatT * 0.55) * 0.9 + Math.sin(bd.floatT * 0.23) * 0.25;

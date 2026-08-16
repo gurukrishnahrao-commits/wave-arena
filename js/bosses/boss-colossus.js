@@ -53,8 +53,9 @@ function updateColossusBoss(delta) {
   }
 
   // Move
-  bossMesh.position.x += dir.x * bd.speed;
-  bossMesh.position.z += dir.z * bd.speed;
+  const step = frameScale(delta);
+  bossMesh.position.x += dir.x * bd.speed * step;
+  bossMesh.position.z += dir.z * bd.speed * step;
   bossMesh.rotation.y += delta * (bd.enraged ? 1.5 : 0.8);
   bd.ring.rotation.x += delta * 2;
 

@@ -210,6 +210,7 @@ function updateSpawnAnimations(delta) {
 }
 
 function updateEnemies(delta) {
+  const step = frameScale(delta);
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
     const ud = e.userData;
@@ -224,8 +225,8 @@ function updateEnemies(delta) {
       case 'basic':
       case 'fast':
         if (distToPlayer > 0.9) {
-          e.position.x += dir.x * ud.speed;
-          e.position.z += dir.z * ud.speed;
+          e.position.x += dir.x * ud.speed * step;
+          e.position.z += dir.z * ud.speed * step;
         } else if (invincibleTimer <= 0) {
           stats.hp -= ud.damage * delta;
           triggerHealthFlash();
@@ -238,15 +239,15 @@ function updateEnemies(delta) {
 
       case 'shooter': {
         if (distToPlayer < ud.preferDist - 1) {
-          e.position.x -= dir.x * ud.speed * 0.8;
-          e.position.z -= dir.z * ud.speed * 0.8;
+          e.position.x -= dir.x * ud.speed * 0.8 * step;
+          e.position.z -= dir.z * ud.speed * 0.8 * step;
         } else if (distToPlayer > ud.preferDist + 1) {
-          e.position.x += dir.x * ud.speed;
-          e.position.z += dir.z * ud.speed;
+          e.position.x += dir.x * ud.speed * step;
+          e.position.z += dir.z * ud.speed * step;
         }
         const perp = new THREE.Vector3(-dir.z, 0, dir.x);
-        e.position.x += perp.x * ud.speed * 0.5 * Math.sin(elapsedTime * 2 + i);
-        e.position.z += perp.z * ud.speed * 0.5 * Math.sin(elapsedTime * 2 + i);
+        e.position.x += perp.x * ud.speed * 0.5 * Math.sin(elapsedTime * 2 + i) * step;
+        e.position.z += perp.z * ud.speed * 0.5 * Math.sin(elapsedTime * 2 + i) * step;
         clampToArena(e.position, 1);
         ud.shootTimer -= delta;
         if (ud.shootTimer <= 0) {
@@ -259,8 +260,8 @@ function updateEnemies(delta) {
 
       case 'exploder':
         if (distToPlayer > ud.fuseRange) {
-          e.position.x += dir.x * ud.speed;
-          e.position.z += dir.z * ud.speed;
+          e.position.x += dir.x * ud.speed * step;
+          e.position.z += dir.z * ud.speed * step;
           const pulse = Math.sin(elapsedTime * 10 + i) * 0.5 + 0.5;
           e.material.emissiveIntensity = 0.3 + (1 - Math.min(1, distToPlayer / 5)) * pulse * 1.5;
         } else if (!ud.exploded) {
