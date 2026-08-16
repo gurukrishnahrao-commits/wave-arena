@@ -139,6 +139,9 @@ function triggerWaveComplete(nextWave) {
     const el = document.getElementById('center-msg');
     el.style.transition = '';
     el.style.opacity = 1;
+    // Normal center messages ignore pointer input. Wave completion is interactive,
+    // so enable it directly instead of relying on a freshly cached stylesheet.
+    el.style.pointerEvents = 'auto';
     const nextIsBoss = isBossWave(waveNumber);
     const bossWarning = nextIsBoss
       ? `<p style="color:#ff3d6e;font-size:14px;margin-top:8px;letter-spacing:2px;">⚠ BOSS WAVE ${waveNumber} INCOMING ⚠</p>`
@@ -147,12 +150,13 @@ function triggerWaveComplete(nextWave) {
     el.innerHTML = `
       <h1 style="font-size:44px;color:#3dffd2;text-shadow:0 0 20px #3dffd280;">WAVE COMPLETE</h1>
       <p>Wave ${waveNumber - 1} cleared</p>${bossWarning}
-      <div style="margin-top:20px;"><button id="wave-complete-continue-btn" class="inline-action">CONTINUE</button></div>`;
+      <div style="margin-top:20px;"><button id="wave-complete-continue-btn" class="inline-action" type="button" style="pointer-events:auto;">CONTINUE</button></div>`;
     document.getElementById('wave-complete-continue-btn').onclick = () => {
       if (gen !== centerMsgGen) return;
       centerMsgGen++;
       waveCompleteMagnet = false;
       collectAllCoinPickups();
+      el.style.pointerEvents = 'none';
       el.style.opacity = 0;
       el.innerHTML = '';
 
