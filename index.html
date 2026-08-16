@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Wave Arena</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <div id="start-screen">
+    <h1>WAVE ARENA</h1>
+    <div class="sub">survive. kill. evolve.</div>
+    <button id="start-btn">ENTER ARENA</button>
+    <div id="controls-hint">WASD to move &nbsp;&nbsp;|&nbsp;&nbsp; Mouse to aim &nbsp;&nbsp;|&nbsp;&nbsp; Click / Hold to shoot</div>
+    <div style="margin-top:28px; color:#6b5a8a; font-size:12px; letter-spacing:1px; text-align:center; line-height:2;">
+      <span style="color:#ff7a3d">▲ BASIC</span> &nbsp;·&nbsp;
+      <span style="color:#ffef00">▲ FAST</span> &nbsp;·&nbsp;
+      <span style="color:#00e5ff">◆ SHOOTER</span> &nbsp;·&nbsp;
+      <span style="color:#ff2244">● EXPLODER</span>
+    </div>
+  </div>
+
+  <div id="joystick-zone">
+    <div id="joystick-base"></div>
+    <div id="joystick-stick"></div>
+  </div>
+  <div id="mobile-hint">AUTO<br>ATK</div>
+
+  <div id="hud" style="display:none;">
+    <div class="hud-box">
+      <div id="wave-label">WAVE</div>
+      <div id="wave-num">1</div>
+      <div id="hp-bar-bg"><div id="hp-bar"></div></div>
+    </div>
+    <div class="hud-box">
+      <div id="timer-label">SURVIVED</div>
+      <div id="timer">0:00</div>
+    </div>
+    <div class="hud-box">
+      <div id="kills-label">KILLS</div>
+      <div id="kills">0</div>
+    </div>
+    <div class="hud-box">
+      <div id="coins-label" style="font-size:12px; letter-spacing:2px; color:#ffd23d; text-align:right;">COINS</div>
+      <div id="coins" style="font-size:24px; color:#ffd23d; text-align:right; font-weight:bold;">0</div>
+    </div>
+  </div>
+
+  <div id="vignette"></div>
+  <div id="scanlines"></div>
+  <div id="damage-flash"></div>
+
+  <div id="center-msg"></div>
+
+  <div id="boss-bar" style="display:none;">
+    <div id="boss-shield-bar" style="display:none;">
+      <div id="boss-shield-fill"></div>
+    </div>
+    <div id="boss-name">THE CRIMSON TITAN</div>
+    <div class="boss-hp-container">
+      <div id="boss-hp-fill"></div>
+      <div id="boss-hp-text"></div>
+    </div>
+  </div>
+
+  <div id="weapon-select-screen">
+    <div id="ws-title">CHOOSE YOUR WEAPON</div>
+    <div id="ws-subtitle">SELECT 1 PRIMARY WEAPON TO BEGIN</div>
+    <div id="ws-cards"></div>
+  </div>
+
+  <div id="upgrade-screen">
+    <div id="shop-header">
+      <div id="shop-title">WAVE <span id="shop-wave-num">1</span> CLEARED</div>
+      <div id="shop-coins-bar">💰 <span id="shop-coin-count">0</span> coins</div>
+    </div>
+    <div id="shop-tabs">
+      <button class="shop-tab active" data-tab="upgrades">⚔️ UPGRADES</button>
+      <button class="shop-tab" data-tab="weapons">🔫 WEAPONS</button>
+      <button class="shop-tab" data-tab="passives">✨ PASSIVES</button>
+    </div>
+    <div id="loadout-bar"></div>
+    <div id="shop-body">
+      <div id="upgrade-options"></div>
+    </div>
+    <button id="shop-continue-btn">▶ NEXT WAVE</button>
+  </div>
+
+  <div id="loading-screen">
+    <div class="loading-content">
+      <h1>WAVE ARENA</h1>
+      <div class="loading-bar-bg">
+        <div id="loading-bar-fill" class="loading-bar-fill"></div>
+      </div>
+      <div id="loading-text">Loading...</div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/mobile.js"></script>
+  <script src="js/scene.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/particles.js"></script>
+  <script src="js/coins.js"></script>
+  <script src="js/projectiles.js"></script>
+  <script src="js/enemies.js"></script>
+  <script src="js/weapons.js"></script>
+  <script src="js/weapons-update.js"></script>
+  <script src="js/passives.js"></script>
+  <script src="js/bosses/boss-core.js"></script>
+  <script src="js/bosses/boss-colossus.js"></script>
+  <script src="js/bosses/boss-sentinel.js"></script>
+  <script src="js/bosses/boss-hivemother.js"></script>
+  <script src="js/waves.js"></script>
+  <script src="js/shop.js"></script>
+  <script src="js/camera.js"></script>
+  <script src="js/graphics.js"></script>
+  <script src="js/save.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
