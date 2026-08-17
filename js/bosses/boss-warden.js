@@ -74,17 +74,18 @@ function spawnWarden(def) {
     freezeShell,
     phase: 1,
     phaseLabel: 'PLASMA ASSAULT',
-    beamTimer: 2,
+    beamTimer: 1,
     orbTimer: 5,
-    activeAttack: null,
+    plasmaBeams: [],
     freezeOrbs: [],
     clones: [],
     transients: [freezeShell],
     contactTimer: 0,
+    beamGraceUntil: 0,
     freezeGraceUntil: 0,
   };
 
-  flashCenterMsg('WARDEN PHASE I · PLASMA BEAM EVERY 2 SECONDS', '#64e7ff');
+  flashCenterMsg('WARDEN PHASE I · PLASMA BEAM EVERY SECOND', '#64e7ff');
   triggerScreenShake(0.55);
   updateWardenUI(bossData);
 }
@@ -107,14 +108,15 @@ function updateWarden(delta) {
   updateWardenFreezeOrbs(delta);
   updateWardenFreezeVisual(delta);
 
-  if (bd.phase === 1) {
-    bd.beamTimer -= delta;
-    if (!bd.activeAttack && bd.beamTimer <= 0) {
-      startWardenPlasmaBeam();
-      bd.beamTimer += 2;
-    }
-    if (bd.activeAttack) updateWardenPlasmaBeam(delta);
-  } else {
+  bd.beamTimer -= delta;
+  if (bd.beamTimer <= 0) {
+    startWardenPlasmaVolley();
+    bd.beamTimer += 1;
+    if (bd.beamTimer <= 0) bd.beamTimer = 1;
+  }
+  updateWardenPlasmaBeams(delta);
+
+  if (bd.phase === 2) {
     bd.orbTimer -= delta;
     if (bd.orbTimer <= 0) {
       fireWardenFreezeVolley();
@@ -154,9 +156,18 @@ function moveWarden(delta) {
   mesh.lookAt(player.position.x, mesh.position.y, player.position.z);
 }
 
-function startWardenPlasmaBeam() {
+function startWardenPlasmaVolley() {
   const bd = bossData;
-  const direction = new THREE.Vector3().subVectors(player.position, bossMesh.position);
+  const sources = [{ mesh: bossMesh, cannon: bd.cannon, primary: true }];
+  if (bd.phase === 2) {
+    for (const clone of bd.clones) sources.push({ mesh: clone.mesh, cannon: clone.cannon, primary: false });
+  }
+  for (const source of sources) startWardenPlasmaBeam(source);
+}
+
+function startWardenPlasmaBeam(source = { mesh: bossMesh, cannon: bossData.cannon, primary: true }) {
+  const bd = bossData;
+  const direction = new THREE.Vector3().subVectors(player.position, source.mesh.position);
   direction.y = 0;
   if (direction.lengthSq() < 0.01) direction.set(1, 0, 0);
   direction.normalize();
@@ -165,56 +176,69 @@ function startWardenPlasmaBeam() {
   const geometry = new THREE.BoxGeometry(length, 0.12, 0.17);
   geometry.translate(length / 2, 0, 0);
   const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
-    color: 0x56efff, transparent: true, opacity: 0.22,
+    color: source.primary ? 0x56efff : 0x9ef7ff,
+    transparent: true, opacity: 0.22, depthWrite: false,
   }));
   scene.add(mesh);
-  bd.activeAttack = {
-    type: 'warden-plasma-beam', mesh, direction,
-    state: 'warning', timer: 0.55, hit: false,
+  const beam = {
+    type: 'warden-plasma-beam', mesh, source: source.mesh, cannon: source.cannon,
+    direction, primary: source.primary, state: 'warning', timer: 0.55,
   };
-  orientWardenPlasmaBeam(bd.activeAttack);
+  bd.plasmaBeams.push(beam);
+  bd.transients.push(mesh);
+  orientWardenPlasmaBeam(beam);
 }
 
 function orientWardenPlasmaBeam(beam) {
-  beam.mesh.position.copy(bossMesh.position);
+  beam.mesh.position.copy(beam.source.position);
   beam.mesh.position.y = 0.78;
   beam.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), beam.direction);
 }
 
-function updateWardenPlasmaBeam(delta) {
+function updateWardenPlasmaBeams(delta) {
   const bd = bossData;
-  const beam = bd.activeAttack;
-  if (!beam) return;
-  beam.timer -= delta;
-  orientWardenPlasmaBeam(beam);
+  for (let i = bd.plasmaBeams.length - 1; i >= 0; i--) {
+    const beam = bd.plasmaBeams[i];
+    beam.timer -= delta;
+    orientWardenPlasmaBeam(beam);
 
-  if (beam.state === 'warning') {
-    beam.mesh.material.opacity = 0.16 + Math.sin(elapsedTime * 32) * 0.1;
-    beam.mesh.scale.z = 0.75 + Math.max(0, 0.55 - beam.timer) * 1.8;
-    if (beam.timer <= 0) {
-      beam.state = 'firing';
-      beam.timer = 0.14;
-      beam.mesh.material.opacity = 1;
-      beam.mesh.scale.z = 7.5;
-      triggerScreenShake(0.45);
-      AudioManager.explosion();
+    if (beam.state === 'warning') {
+      beam.mesh.material.opacity = 0.16 + Math.sin(elapsedTime * 32) * 0.1;
+      beam.mesh.scale.z = 0.75 + Math.max(0, 0.55 - beam.timer) * 1.8;
+      if (beam.cannon) beam.cannon.scale.z = 1 + Math.max(0, 0.55 - beam.timer) * 0.3;
+      if (beam.timer <= 0) {
+        beam.state = 'firing';
+        beam.timer = 0.14;
+        beam.mesh.material.opacity = 1;
+        beam.mesh.scale.z = 10.5;
+        if (beam.cannon) beam.cannon.scale.z = 0.82;
+        if (beam.primary) {
+          triggerScreenShake(0.45);
+          AudioManager.explosion();
+        }
 
-      const toPlayer = new THREE.Vector3().subVectors(player.position, bossMesh.position);
-      toPlayer.y = 0;
-      const along = toPlayer.dot(beam.direction);
-      const perpendicular = toPlayer.clone().sub(beam.direction.clone().multiplyScalar(along)).length();
-      if (along >= 0 && along <= CONFIG.ARENA_RADIUS * 2 && perpendicular < 0.9 && invincibleTimer <= 0) {
-        stats.hp -= 32;
-        triggerHealthFlash();
+        const toPlayer = new THREE.Vector3().subVectors(player.position, beam.source.position);
+        toPlayer.y = 0;
+        const along = toPlayer.dot(beam.direction);
+        const perpendicular = toPlayer.clone().sub(beam.direction.clone().multiplyScalar(along)).length();
+        if (
+          along >= 0 && along <= CONFIG.ARENA_RADIUS * 2 && perpendicular < 0.9 &&
+          invincibleTimer <= 0 && elapsedTime >= bd.beamGraceUntil
+        ) {
+          stats.hp -= 32;
+          bd.beamGraceUntil = elapsedTime + 0.2;
+          triggerHealthFlash();
+        }
+      }
+    } else {
+      beam.mesh.material.opacity = Math.max(0, beam.timer / 0.14);
+      if (beam.cannon) beam.cannon.scale.z += (1 - beam.cannon.scale.z) * frameLerp(0.3, delta);
+      if (beam.timer <= 0) {
+        if (beam.cannon) beam.cannon.scale.z = 1;
+        removeWardenTransient(beam.mesh);
+        bd.plasmaBeams.splice(i, 1);
       }
     }
-    return;
-  }
-
-  beam.mesh.material.opacity = Math.max(0, beam.timer / 0.14);
-  if (beam.timer <= 0) {
-    removeAndDispose(beam.mesh);
-    bd.activeAttack = null;
   }
 }
 
@@ -223,10 +247,8 @@ function enterWardenClonePhase() {
   bd.phase = 2;
   bd.phaseLabel = 'CRYO MIRROR';
   bd.orbTimer = 5;
-  if (bd.activeAttack?.mesh) removeAndDispose(bd.activeAttack.mesh);
-  bd.activeAttack = null;
   spawnWardenClones();
-  flashCenterMsg('WARDEN PHASE II · TWO CLONES ONLINE · CRYO ORBS', '#9ef7ff');
+  flashCenterMsg('WARDEN PHASE II · TRIPLE PLASMA · CRYO ORBS', '#9ef7ff');
   triggerColorFlash('rgba(100,231,255,0.32)', 120, 480);
   triggerScreenShake(0.75);
 }

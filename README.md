@@ -90,7 +90,7 @@ Prepare a dedicated Poki build with its SDK and event lifecycle. Keep all game a
 
 - Immediate Pulse Rifle start with first-run playable movement, firing, kill, and pickup training.
 - A 25-wave campaign across six arena themes, ending in a final victory encounter.
-- Fixed milestone bosses: Sentinel (5), Hive Mother (10), Warden (15), Aether Regent (20), and Sovereign Core (25). The 5,000-HP Warden fires a telegraphed plasma beam every two seconds in phase one. At 50% health, it creates two combat clones; the Warden and both clones launch glowing cryo balls every five seconds that briefly freeze movement and weapons on hit.
+- Fixed milestone bosses: Sentinel (5), Hive Mother (10), Warden (15), Aether Regent (20), and Sovereign Core (25). The 5,000-HP Warden fires a telegraphed plasma beam every second in phase one. At 50% health, it creates two combat clones; all three Wardens continue the one-second plasma attack and launch glowing cryo balls every five seconds that briefly freeze movement and weapons on hit.
 - Defeating the Warden awards 1,000 arena coins and permanently unlocks the Warden Core, granting +10% base weapon damage on future campaign runs. Existing wave-15 milestone saves receive the unlock automatically.
 - Seven enemy archetypes, including telegraphed dashers, healing/shield support units, and splitters.
 - Primary and secondary weapons, passives, upgrades, between-wave shops, and checkpoint continues.

@@ -25,15 +25,16 @@ function testWardenAssetRouting() {
   const index = read('index.html');
   const core = read('js/bosses/boss-core.js');
   const warden = read('js/bosses/boss-warden.js');
-  assert(index.includes('js/bosses/boss-warden.js?v=20260817d'), 'current Wave 15 Warden script is not loaded');
+  assert(index.includes('js/bosses/boss-warden.js?v=20260817e'), 'current Wave 15 Warden script is not loaded');
   assert(!index.includes('boss-voidreaver.js'), 'retired Null Reaver script is still loaded');
   assert(index.includes('W15 · WARDEN'), 'Wave 15 QA control is not labeled for the Warden');
   assert(core.includes("type: 'warden'"), 'Wave 15 boss definition is not routed to the Warden');
   assert(core.includes('CRYO-MIRROR PROTOCOL'), 'obsolete Warden encounter title is still active');
   assert(core.includes('hp: 5000') && core.includes('coins: 1000'), 'Warden health or coin reward regressed');
-  assert(warden.includes('bd.beamTimer += 2'), 'Warden plasma-beam cadence regressed');
+  assert(warden.includes('bd.beamTimer += 1'), 'Warden one-second plasma-beam cadence regressed');
   assert(warden.includes('bd.currentHp / bd.hp <= 0.5'), 'Warden phase-two gate regressed');
   assert(warden.includes('for (let i = 0; i < 2; i++)'), 'Warden no longer creates exactly two clones');
+  assert(warden.includes('for (const clone of bd.clones) sources.push'), 'Warden and both clones no longer share the phase-two plasma volley');
   assert(warden.includes('bd.orbTimer += 5'), 'Warden glowing-ball cadence regressed');
   assert(warden.includes('freezeWardenPlayer(1.35)'), 'Warden glowing balls no longer freeze the player');
   assert(!/Lockdown|Overdrive|WardenShockwave|WardenReinforcement/.test(warden), 'rejected Warden area-control mechanics remain');

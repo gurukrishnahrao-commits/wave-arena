@@ -125,21 +125,21 @@ assert.strictEqual(context.bossData.currentHp, hp - 100, 'phase-one damage shoul
 
 context.bossData.beamTimer = 0;
 context.updateWarden(0.016);
-assert(context.bossData.activeAttack, 'phase one did not start its plasma beam');
-assert.strictEqual(context.bossData.activeAttack.type, 'warden-plasma-beam');
-assert.strictEqual(context.bossData.activeAttack.state, 'warning');
-assert(context.bossData.activeAttack.timer > 0.5, 'plasma beam warning is not readable');
-assert(context.bossData.beamTimer > 1.9 && context.bossData.beamTimer <= 2, 'plasma beam cadence is not two seconds');
+assert.strictEqual(context.bossData.plasmaBeams.length, 1, 'phase one did not start exactly one plasma beam');
+assert.strictEqual(context.bossData.plasmaBeams[0].type, 'warden-plasma-beam');
+assert.strictEqual(context.bossData.plasmaBeams[0].state, 'warning');
+assert(context.bossData.plasmaBeams[0].timer > 0.5, 'plasma beam warning is not readable');
+assert(context.bossData.beamTimer > 0.9 && context.bossData.beamTimer <= 1, 'plasma beam cadence is not one second');
 
-const beam = context.bossData.activeAttack;
+const beam = context.bossData.plasmaBeams[0];
 context.player.position.copy(context.bossMesh.position).addScaledVector(beam.direction, 5);
 context.player.position.y = 0.75;
 hp = context.stats.hp;
-context.updateWardenPlasmaBeam(0.6);
+context.updateWardenPlasmaBeams(0.6);
 assert.strictEqual(beam.state, 'firing');
 assert.strictEqual(context.stats.hp, hp - 32, 'plasma beam failed to damage a player in its firing lane');
-context.updateWardenPlasmaBeam(0.2);
-assert.strictEqual(context.bossData.activeAttack, null, 'plasma beam was not cleaned up after firing');
+context.updateWardenPlasmaBeams(0.2);
+assert.strictEqual(context.bossData.plasmaBeams.length, 0, 'plasma beam was not cleaned up after firing');
 
 context.bossData.currentHp = 2500;
 context.updateWarden(0.016);
@@ -151,6 +151,18 @@ for (const clone of context.bossData.clones) {
   assert(scene.children.includes(clone.mesh), 'clone projection was not added to the scene');
   assert(clone.cannon, 'clone projection is missing its attack cannon');
 }
+
+context.elapsedTime = 1;
+context.bossData.beamTimer = 0;
+context.updateWarden(0.01);
+assert.strictEqual(context.bossData.plasmaBeams.length, 3, 'the Warden and both clones must each fire a phase-two plasma beam');
+assert.strictEqual(context.bossData.plasmaBeams.filter(entry => entry.primary).length, 1, 'phase-two beam volley lost its primary Warden source');
+hp = context.stats.hp;
+context.updateWardenPlasmaBeams(0.6);
+assert(context.bossData.plasmaBeams.every(entry => entry.state === 'firing'), 'all three phase-two beams did not fire');
+assert.strictEqual(context.stats.hp, hp - 32, 'simultaneous phase-two beams should apply one fair damage instance');
+context.updateWardenPlasmaBeams(0.2);
+assert.strictEqual(context.bossData.plasmaBeams.length, 0, 'phase-two plasma beams were not cleaned up');
 
 context.bossData.orbTimer = 0;
 context.updateWarden(0.01);
@@ -207,4 +219,4 @@ assert(!shell.parent, 'cleanup left the freeze shell attached to the player');
 assert(!scene.children.includes(boss));
 for (const mesh of tracked) assert(!mesh.parent, 'cleanup leaked a Warden clone or transient');
 
-console.log('Warden phase gate, two-second plasma, clone volley, five-second freeze, and cleanup tests passed.');
+console.log('Warden phase gate, one-second triple plasma, five-second clone freeze volley, and cleanup tests passed.');
