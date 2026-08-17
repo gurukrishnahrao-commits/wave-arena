@@ -120,6 +120,11 @@ let finalVictoryPending = false;
 let runMetaStarted = false;
 let permanentStatsApplied = false;
 
+// Temporary boss-only QA phase (disabled/removed before release)
+let bossTestMode = false;
+let bossTestWave = null;
+let bossTestEncounterId = 0;
+
 // First-run training state
 let tutorialActive = false;
 let tutorialStep = 'idle';

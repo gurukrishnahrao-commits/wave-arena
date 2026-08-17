@@ -107,6 +107,7 @@ function loadMeta() {
 }
 
 function persistMeta() {
+  if (bossTestMode) return;
   try {
     localStorage.setItem(META_KEY, JSON.stringify(metaProgress));
   } catch (e) {
@@ -115,6 +116,7 @@ function persistMeta() {
 }
 
 function saveMeta() {
+  if (bossTestMode) return;
   metaProgress.highestWave = Math.max(metaProgress.highestWave, Math.min(waveNumber, CONFIG.FINAL_WAVE));
   metaProgress.bestTime = Math.max(metaProgress.bestTime, elapsedTime);
   checkAchievements(true);
@@ -123,7 +125,7 @@ function saveMeta() {
 }
 
 function beginRunMeta() {
-  if (runMetaStarted) return;
+  if (bossTestMode || runMetaStarted) return;
   runMetaStarted = true;
   metaProgress.gamesPlayed++;
   checkAchievements(false);
@@ -131,23 +133,27 @@ function beginRunMeta() {
 }
 
 function recordEnemyDefeat() {
+  if (bossTestMode) return;
   metaProgress.totalKills++;
   checkAchievements(false);
   if (metaProgress.totalKills % 10 === 0) persistMeta();
 }
 
 function recordCoinCollected(value) {
+  if (bossTestMode) return;
   metaProgress.totalCoins += Math.max(0, Number(value) || 0);
   checkAchievements(false);
 }
 
 function recordWaveReached(wave) {
+  if (bossTestMode) return;
   metaProgress.highestWave = Math.max(metaProgress.highestWave, Math.min(wave, CONFIG.FINAL_WAVE));
   checkAchievements(false);
   persistMeta();
 }
 
 function recordBossDefeat() {
+  if (bossTestMode) return;
   metaProgress.bossesDefeated++;
   metaProgress.bossMilestones[`wave_${waveNumber}`] = true;
   const reward = 12 + Math.floor(waveNumber * 1.4);
@@ -158,6 +164,7 @@ function recordBossDefeat() {
 }
 
 function recordCampaignVictory() {
+  if (bossTestMode) return;
   metaProgress.victories++;
   metaProgress.highestWave = CONFIG.FINAL_WAVE;
   metaProgress.bestTime = Math.max(metaProgress.bestTime, elapsedTime);
@@ -166,6 +173,7 @@ function recordCampaignVictory() {
 }
 
 function checkAchievements(silent = false) {
+  if (bossTestMode) return;
   for (const achievement of ACHIEVEMENTS) {
     if (metaProgress.achievements[achievement.id] || !achievement.test(metaProgress)) continue;
     metaProgress.achievements[achievement.id] = Date.now();
@@ -237,6 +245,7 @@ function permanentUpgradeCost(id) {
 }
 
 function buyPermanentUpgrade(id) {
+  if (bossTestMode) return;
   const def = PERMANENT_UPGRADES.find(p => p.id === id);
   if (!def) return;
   const level = metaProgress.permanent[id] || 0;
@@ -348,6 +357,7 @@ function cycleQuality() {
 }
 
 function saveCheckpoint() {
+  if (bossTestMode) return;
   checkpoint = {
     waveNumber, coins, killCount,
     stats: { ...stats },

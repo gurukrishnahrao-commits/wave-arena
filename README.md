@@ -42,7 +42,13 @@ No npm install or bundler is required:
 python3 scripts/build_release.py
 ```
 
-This creates `release/wave-arena.zip`. The script:
+This creates `release/wave-arena.zip`. While the temporary boss test phase is enabled, its routing and save-isolation harness can be run with:
+
+```bash
+node scripts/test_boss_qa.js
+```
+
+The build script:
 
 - puts `index.html` at the ZIP root;
 - includes only runtime files from `css/` and `js/`;
@@ -78,6 +84,8 @@ The current self-contained build is suitable for initial testing. A full launch 
 Prepare a dedicated Poki build with its SDK and event lifecycle. Keep all game assets and libraries local, support desktop/mobile/tablet, test a 16:9 viewport, and keep storage calls protected with `try/catch`. This project already wraps its `localStorage` access and now avoids external CDN requests.
 
 ## Current game features
+
+> **Temporary QA control:** the start screen currently exposes boss-only jumps for waves 5, 10, 15, 20, and 25. Boss-test runs use a fixed QA loadout and do not write progression. Remove the marked boss-test code and UI before final release.
 
 - Immediate Pulse Rifle start with first-run playable movement, firing, kill, and pickup training.
 - A 25-wave campaign across six arena themes, ending in a final victory encounter.

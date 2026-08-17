@@ -167,6 +167,7 @@ canvas { display: block; touch-action: none; }
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
   background: #0a0612; display: flex; flex-direction: column;
   justify-content: center; align-items: center; z-index: 30; color: #fff;
+  overflow-y: auto; box-sizing: border-box; padding: 24px;
 }
 #start-screen h1 {
   font-size: 56px; letter-spacing: 6px; color: #ff3d6e;
@@ -384,6 +385,36 @@ canvas { display: block; touch-action: none; }
 .danger-btn { border-color:#73253d; color:#ff7898; margin-top:26px; }
 #start-progress { min-height:16px; margin-top:14px; color:#9d85c0; font-size:11px; letter-spacing:1.2px; }
 
+/* TEMP QA: boss-only jump controls. Remove this block before final release. */
+#boss-test-panel {
+  width:min(720px,92vw); margin-top:16px; padding:10px 12px; box-sizing:border-box;
+  border:1px dashed #ff9d3d99; border-radius:6px; background:rgba(43,20,5,.6);
+  box-shadow:0 0 24px #ff7a3d15; text-align:center;
+}
+#boss-test-panel>div:first-child { display:flex; justify-content:center; gap:14px; align-items:center; }
+#boss-test-panel strong { color:#ffb14a; font-size:10px; letter-spacing:2px; }
+#boss-test-panel span,#boss-test-panel small { color:#9c7758; font-size:8px; letter-spacing:1.2px; }
+.boss-test-buttons { display:flex; flex-wrap:wrap; justify-content:center; gap:6px; margin:8px 0 6px; }
+.boss-test-buttons button {
+  border:1px solid #925126; border-radius:3px; background:#221207; color:#ffc27a;
+  padding:7px 9px; font:700 9px 'Courier New',monospace; letter-spacing:.7px; cursor:pointer;
+}
+.boss-test-buttons button:hover,.boss-test-buttons button:focus-visible,.boss-test-buttons button.active {
+  border-color:#ffb14a; color:#fff; outline:none; box-shadow:0 0 12px #ff8a3d55;
+}
+#boss-test-dock {
+  display:none; position:fixed; z-index:58; right:calc(20px + env(safe-area-inset-right,0px));
+  top:calc(145px + env(safe-area-inset-top,0px)); width:176px; box-sizing:border-box;
+  padding:9px; border:1px dashed #ff9d3daa; border-radius:5px;
+  background:rgba(27,12,4,.9); box-shadow:0 0 20px #ff7a3d22; pointer-events:auto; text-align:center;
+}
+body.boss-test-active #boss-test-dock { display:block; }
+#boss-test-dock strong,#boss-test-dock span { display:block; }
+#boss-test-dock strong { color:#ffb14a; font-size:9px; letter-spacing:1.5px; }
+#boss-test-dock span { color:#9c7758; font-size:7px; margin-top:3px; }
+#boss-test-dock .boss-test-buttons { margin-bottom:0; }
+#boss-test-dock .boss-test-buttons button { min-width:25px; padding:5px 4px; }
+
 #tutorial-card {
   display:none; position:fixed; z-index:74; left:50%; bottom:max(22px, env(safe-area-inset-bottom));
   transform:translateX(-50%) translateY(12px); width:min(520px,calc(100vw - 32px));
@@ -479,8 +510,13 @@ canvas { display: block; touch-action: none; }
   .meta-panel { padding:20px 14px; }
   #victory-stats { grid-template-columns:repeat(2,1fr); }
 }
+@media(max-height:600px){
+  #start-screen { justify-content:flex-start; }
+}
 @media(max-width:480px){
   .menu-actions { flex-direction:column; width:min(280px,80vw); }
+  #boss-test-panel>div:first-child { flex-direction:column; gap:3px; }
+  #boss-test-dock { top:auto; right:10px; bottom:84px; width:164px; }
   #tutorial-card { padding-right:68px; bottom:90px; }
   .tutorial-title { font-size:14px; }
   .tutorial-body { font-size:9px; }

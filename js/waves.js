@@ -176,10 +176,22 @@ function triggerWaveComplete(nextWave) {
 function onBossDefeated() {
   bossDeathPending = true;
   const defeatedWave = waveNumber;
+  const defeatedTestEncounter = bossTestEncounterId;
   recordBossDefeat();
   for (const enemy of enemies) removeAndDispose(enemy);
   enemies.length = 0;
   while (enemyProjectiles.length) releaseEnemyProjectile(enemyProjectiles.pop());
+
+  // TEMP QA: boss tests stop after the selected encounter instead of entering
+  // the normal campaign wave, and never trigger final campaign victory.
+  if (bossTestMode) {
+    setTimeout(() => {
+      if (!bossDeathPending || waveNumber !== defeatedWave || bossTestEncounterId !== defeatedTestEncounter) return;
+      showBossTestResult(defeatedWave, true);
+    }, 2500);
+    return;
+  }
+
   if (waveNumber === CONFIG.FINAL_WAVE) finalVictoryPending = true;
   setTimeout(() => {
     if (!bossDeathPending || waveNumber !== defeatedWave) return;

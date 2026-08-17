@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#0a0612">
   <meta name="description" content="Survive escalating enemy waves, build a loadout, and defeat arena bosses.">
   <title>Wave Arena</title>
-  <link rel="stylesheet" href="css/styles.css?v=20260817a">
+  <link rel="stylesheet" href="css/styles.css?v=20260817b">
 </head>
 <body>
 
@@ -20,6 +20,17 @@
       <button id="command-btn" class="secondary-btn" type="button">COMMAND CENTER</button>
       <button id="settings-btn" class="secondary-btn" type="button">SETTINGS</button>
     </div>
+    <section id="boss-test-panel" aria-label="Temporary boss test phase">
+      <div><strong>⚠ TEMP QA · BOSS TEST PHASE</strong><span>PROGRESSION DISABLED</span></div>
+      <div class="boss-test-buttons">
+        <button type="button" data-boss-test-wave="5">W5 · SENTINEL</button>
+        <button type="button" data-boss-test-wave="10">W10 · HIVE</button>
+        <button type="button" data-boss-test-wave="15">W15 · NULL</button>
+        <button type="button" data-boss-test-wave="20">W20 · AETHER</button>
+        <button type="button" data-boss-test-wave="25">W25 · CORE</button>
+      </div>
+      <small>Temporary test controls—remove before the final release.</small>
+    </section>
     <div id="start-progress" aria-live="polite"></div>
     <div id="controls-hint">WASD to move &nbsp;&nbsp;|&nbsp;&nbsp; Mouse to aim &nbsp;&nbsp;|&nbsp;&nbsp; Click / Hold to shoot</div>
     <div style="margin-top:28px; color:#6b5a8a; font-size:12px; letter-spacing:1px; text-align:center; line-height:2;">
@@ -29,6 +40,18 @@
       <span style="color:#ff2244">● EXPLODER</span>
     </div>
   </div>
+
+  <aside id="boss-test-dock" aria-label="Boss test jumps">
+    <strong>QA BOSS JUMP</strong>
+    <span>TEST PROGRESSION OFF</span>
+    <div class="boss-test-buttons">
+      <button type="button" data-boss-test-wave="5">5</button>
+      <button type="button" data-boss-test-wave="10">10</button>
+      <button type="button" data-boss-test-wave="15">15</button>
+      <button type="button" data-boss-test-wave="20">20</button>
+      <button type="button" data-boss-test-wave="25">25</button>
+    </div>
+  </aside>
 
   <div id="joystick-zone">
     <div id="joystick-base"></div>
@@ -168,11 +191,11 @@
   <!-- Keep engine code local: game portals may block third-party CDN requests. -->
   <script src="js/vendor/three.min.js"></script>
 
-  <script src="js/config.js"></script>
+  <script src="js/config.js?v=20260817b"></script>
   <script src="js/utils.js"></script>
-  <script src="js/state.js"></script>
+  <script src="js/state.js?v=20260817b"></script>
   <script src="js/resources.js"></script>
-  <script src="js/save.js?v=20260817a"></script>
+  <script src="js/save.js?v=20260817b"></script>
   <script src="js/audio.js"></script>
   <script src="js/input.js"></script>
   <script src="js/mobile.js"></script>
@@ -194,10 +217,10 @@
   <script src="js/bosses/boss-aetherregent.js"></script>
   <script src="js/bosses/boss-sovereigncore.js"></script>
   <script src="js/tutorial.js"></script>
-  <script src="js/waves.js?v=20260816b"></script>
+  <script src="js/waves.js?v=20260817b"></script>
   <script src="js/shop.js"></script>
   <script src="js/camera.js"></script>
   <script src="js/graphics.js"></script>
-  <script src="js/main.js"></script>
+  <script src="js/main.js?v=20260817b"></script>
 </body>
 </html>

@@ -13,6 +13,7 @@ function init() {
   setupMobileControls();
   setupQuickControls();
   setupProgressionUI();
+  setupBossTestControls();
   renderSettingsControls();
   AudioManager.setMusicMode('menu');
 
@@ -75,6 +76,168 @@ function setupProgressionUI() {
   };
 }
 
+// TEMP QA: boss-only test phase. Remove this block and its marked UI before release.
+function setupBossTestControls() {
+  const enabled = !!CONFIG.BOSS_TEST_ENABLED;
+  const panel = document.getElementById('boss-test-panel');
+  const dock = document.getElementById('boss-test-dock');
+  if (!enabled) {
+    if (panel) panel.style.display = 'none';
+    if (dock) dock.style.display = 'none';
+    return;
+  }
+
+  document.querySelectorAll('[data-boss-test-wave]').forEach(button => {
+    button.onclick = () => {
+      const wave = Number(button.dataset.bossTestWave);
+      if (!CONFIG.BOSS_WAVES.includes(wave)) return;
+      if (!bossTestMode) startBossTest(wave);
+      else jumpToBossTestWave(wave);
+    };
+  });
+}
+
+function clearBossTestSession() {
+  bossTestMode = false;
+  bossTestWave = null;
+  bossTestEncounterId++;
+  document.body.classList.remove('boss-test-active');
+  document.querySelectorAll('[data-boss-test-wave]').forEach(button => button.classList.remove('active'));
+  document.getElementById('wave-label').textContent = 'WAVE';
+  document.getElementById('timer-label').textContent = 'TIME';
+}
+
+function configureBossTestLoadout() {
+  loadout.primary = 'pulse';
+  loadout.secondary = 'sniper';
+  loadout.passive = 'regen';
+  passiveRegen = true;
+  regenTimer = 0;
+
+  stats.speed = 0.105;
+  stats.attackRange = 7;
+  stats.attackDamage = 8;
+  stats.attackSpeed = 0.35;
+  stats.maxHP = 240;
+  stats.hp = stats.maxHP;
+  stats.critChance = 0.2;
+  stats.coinMult = 1;
+  stats.coinMagnet = false;
+  stats.thorns = false;
+  for (const weapon of WEAPONS) {
+    weapon.timer = 0;
+    if (weapon.upgrade) weapon.upgrade.applied = false;
+  }
+}
+
+function startBossTest(wave) {
+  if (!CONFIG.BOSS_TEST_ENABLED || !CONFIG.BOSS_WAVES.includes(wave)) return;
+  bossTestMode = true;
+  document.body.classList.add('boss-test-active');
+  document.getElementById('start-screen').style.display = 'none';
+  document.getElementById('hud').style.display = 'flex';
+  document.getElementById('quick-controls').style.display = 'flex';
+  AudioManager.resume();
+  configureBossTestLoadout();
+  jumpToBossTestWave(wave);
+}
+
+function jumpToBossTestWave(wave) {
+  if (!bossTestMode || !CONFIG.BOSS_WAVES.includes(wave)) return;
+  bossTestWave = wave;
+  bossTestEncounterId++;
+  centerMsgGen++;
+  clearActiveInput();
+  cleanupArena();
+  cleanupBoss();
+
+  waveNumber = wave;
+  waveTimer = 0;
+  spawnTimer = 0;
+  elapsedTime = 0;
+  waveClearPending = false;
+  waveCompleteMagnet = false;
+  bossDeathPending = false;
+  finalVictoryPending = false;
+  bossSpawnedWave = -1;
+  timeScale = 1;
+  tutorialActive = false;
+  tutorialStep = 'idle';
+  configureBossTestLoadout();
+  killCount = 0;
+  coins = 0;
+
+  player.position.set(0, 0.75, 0);
+  player.visible = true;
+  invincibleTimer = 1.5;
+  blinkTimer = 0;
+
+  let themeIndex = 0;
+  for (let i = ARENA_THEMES.length - 1; i >= 0; i--) {
+    if (wave >= ARENA_THEMES[i].wave) { themeIndex = i; break; }
+  }
+  currentArena = themeIndex;
+  applyArenaTheme(ARENA_THEMES[themeIndex]);
+
+  document.querySelectorAll('[data-boss-test-wave]').forEach(button => {
+    button.classList.toggle('active', Number(button.dataset.bossTestWave) === wave);
+  });
+  document.getElementById('wave-label').textContent = 'BOSS TEST';
+  document.getElementById('wave-num').textContent = wave;
+  document.getElementById('timer-label').textContent = 'QA TIME';
+  document.getElementById('timer').textContent = '0:00';
+  document.getElementById('kills').textContent = killCount;
+  document.getElementById('coins').textContent = Math.floor(coins);
+  document.getElementById('hp-bar').style.width = '100%';
+  document.getElementById('tutorial-card').classList.remove('visible');
+  document.getElementById('pause-screen').style.display = 'none';
+
+  const center = document.getElementById('center-msg');
+  center.style.pointerEvents = 'none';
+  center.style.transition = '';
+  center.style.opacity = 0;
+  center.innerHTML = '';
+
+  gameState = 'playing';
+  AudioManager.setMusicMode('boss');
+  clock.getDelta();
+}
+
+function showBossTestResult(wave, cleared) {
+  if (!bossTestMode) return;
+  bossDeathPending = false;
+  finalVictoryPending = false;
+  waveClearPending = false;
+  timeScale = 1;
+  clearActiveInput();
+  cleanupArena();
+  cleanupBoss();
+  gameState = 'bosstestcomplete';
+  AudioManager.setMusicMode('menu');
+
+  const currentIndex = CONFIG.BOSS_WAVES.indexOf(wave);
+  const nextWave = CONFIG.BOSS_WAVES[(currentIndex + 1) % CONFIG.BOSS_WAVES.length];
+  const center = document.getElementById('center-msg');
+  const gen = ++centerMsgGen;
+  center.style.transition = '';
+  center.style.opacity = 1;
+  center.style.pointerEvents = 'auto';
+  center.innerHTML = `
+    <div style="color:#ffb14a;font-size:11px;letter-spacing:3px;">TEMP QA · PROGRESSION DISABLED</div>
+    <h1 style="color:${cleared ? '#3dffd2' : '#ff3d6e'};font-size:38px;margin-top:10px;">${cleared ? 'BOSS TEST CLEARED' : 'BOSS TEST FAILED'}</h1>
+    <p>Wave ${wave} · Use the QA dock or continue below.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:18px;">
+      <button id="boss-test-retry" class="inline-action" type="button">RETRY WAVE ${wave}</button>
+      <button id="boss-test-next" class="inline-action" type="button">NEXT · WAVE ${nextWave}</button>
+    </div>`;
+  document.getElementById('boss-test-retry').onclick = () => {
+    if (gen === centerMsgGen) jumpToBossTestWave(wave);
+  };
+  document.getElementById('boss-test-next').onclick = () => {
+    if (gen === centerMsgGen) jumpToBossTestWave(nextWave);
+  };
+}
+
 function pauseGame() {
   if (gameState !== 'playing') return;
   gameState = 'paused';
@@ -99,6 +262,10 @@ function togglePause() {
 }
 
 function gameOver() {
+  if (bossTestMode) {
+    showBossTestResult(waveNumber, false);
+    return;
+  }
   gameState = 'dead';
   waveClearPending = false;
   waveCompleteMagnet = false;
@@ -250,6 +417,7 @@ function animate() {
 
 // ---- START BUTTON ----
 document.getElementById('start-btn').onclick = () => {
+  clearBossTestSession();
   AudioManager.resume();
   beginRunMeta();
   applyPermanentProgression();

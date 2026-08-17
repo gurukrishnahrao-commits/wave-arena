@@ -7,6 +7,7 @@ const CONFIG = {
   WAVE_DURATION: 20,        // seconds per wave
   FINAL_WAVE: 25,           // campaign victory endpoint
   BOSS_WAVES: [5, 10, 15, 20, 25],
+  BOSS_TEST_ENABLED: true,   // TEMP QA: remove the boss-jump phase before release
   BOSS_EVERY: 5,            // retained for compatibility with older helpers
   MAX_ENEMIES_BASE: 10,     // base max enemies on screen
   MAX_ENEMIES_PER_WAVE: 2,  // additional per wave number
