@@ -12,7 +12,7 @@ function updateWeapons(delta) {
     }
   }
 
-  const shouldFire = isTouchDevice || mouseDown;
+  const shouldFire = !isPlayerFrozen() && (isTouchDevice || mouseDown);
   const active = equippedWeapons();
   for (const w of active) {
     if (w.id === 'orbital' || w.id === 'plasma') continue; // self-managed
@@ -105,9 +105,10 @@ function updateFireballs(delta) {
 function updateOrbitalBlades(delta) {
   if (orbitalBlades.length === 0) return;
   const w = getWeapon('orbital');
+  const frozen = isPlayerFrozen();
   const speed = w?.upgrade.applied ? 6 : 3;
   const radius = 2.2 + stats.attackRange * 0.15 + (w?.upgrade.applied ? 1 : 0);
-  orbitalAngle += delta * speed;
+  if (!frozen) orbitalAngle += delta * speed;
 
   for (const blade of orbitalBlades) {
     const angle = orbitalAngle + blade.userData.angleOffset;
@@ -115,6 +116,7 @@ function updateOrbitalBlades(delta) {
     blade.position.z = player.position.z + Math.sin(angle) * radius;
     blade.position.y = 0.7;
     blade.rotation.y = angle + Math.PI / 2;
+    if (frozen) continue;
 
     const cd = blade.userData.hitCooldowns;
     const now = performance.now();
@@ -206,7 +208,7 @@ function updatePlasmaBeam(delta) {
     scene.add(plasmaBeamMesh);
   }
 
-  const shouldFire = isTouchDevice || mouseDown;
+  const shouldFire = !isPlayerFrozen() && (isTouchDevice || mouseDown);
   const { enemy } = shouldFire ? findEnemyInCone(stats.attackRange * 1.4, 0.2) : { enemy: null };
 
   if (!enemy) {

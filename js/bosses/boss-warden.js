@@ -1,12 +1,12 @@
 // ============================================
-// THE WARDEN — three-phase area-control boss (wave 15)
+// THE WARDEN — plasma, cryo-lock, and combat clones (wave 15)
 // ============================================
 
 function spawnWarden(def) {
-  const away = new THREE.Vector3().subVectors(new THREE.Vector3(0, 0, 0), player.position);
-  if (away.lengthSq() < 0.01) away.set(1, 0, 0);
-  away.normalize().multiplyScalar(9);
-  const parts = buildMilestoneBoss(def, away);
+  const spawnDirection = new THREE.Vector3().subVectors(new THREE.Vector3(0, 0, 0), player.position);
+  if (spawnDirection.lengthSq() < 0.01) spawnDirection.set(1, 0, 0);
+  spawnDirection.normalize().multiplyScalar(9);
+  const parts = buildMilestoneBoss(def, spawnDirection);
   bossMesh = parts.mesh;
 
   const armorMat = new THREE.MeshStandardMaterial({
@@ -28,25 +28,40 @@ function spawnWarden(def) {
   }
   bossMesh.add(shoulders);
 
-  const hammer = new THREE.Group();
-  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 3.5, 7), armorMat);
-  handle.position.y = -0.7;
-  const head = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.85, 0.9), armorMat);
-  head.position.y = 1.05;
-  const headCore = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.16, 0.94), edgeMat);
-  headCore.position.set(0, 1.05, 0);
-  hammer.add(handle, head, headCore);
-  hammer.position.set(2.25, -0.15, 0.25);
-  hammer.rotation.z = -0.42;
-  bossMesh.add(hammer);
+  const cannon = new THREE.Group();
+  cannon.userData.wardenCannon = true;
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.28, 2.4, 8), armorMat);
+  barrel.rotation.x = Math.PI / 2;
+  barrel.position.z = 0.75;
+  const muzzle = new THREE.Mesh(new THREE.TorusGeometry(0.31, 0.09, 7, 18), edgeMat);
+  muzzle.position.z = 1.95;
+  cannon.add(barrel, muzzle);
+  cannon.position.set(1.75, 0.15, 0);
+  bossMesh.add(cannon);
 
-  const shieldMesh = new THREE.Mesh(
-    new THREE.IcosahedronGeometry(def.size * 0.92, 1),
-    new THREE.MeshBasicMaterial({ color: 0x39d9ff, wireframe: true, transparent: true, opacity: 0 })
+  const phaseHalo = new THREE.Mesh(
+    new THREE.TorusGeometry(def.size * 0.96, 0.055, 7, 32),
+    new THREE.MeshBasicMaterial({ color: 0x64e7ff, transparent: true, opacity: 0.72 })
   );
-  bossMesh.add(shieldMesh);
+  phaseHalo.rotation.x = Math.PI / 2;
+  phaseHalo.position.y = 0.45;
+  bossMesh.add(phaseHalo);
+
   setObjectShadows(shoulders, getGameSettings().quality !== 'low');
-  setObjectShadows(hammer, getGameSettings().quality !== 'low');
+  setObjectShadows(cannon, getGameSettings().quality !== 'low');
+
+  const freezeShell = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(0.92, 1),
+    new THREE.MeshBasicMaterial({
+      color: 0x9ef7ff, wireframe: true, transparent: true, opacity: 0.55,
+      depthWrite: false,
+    })
+  );
+  freezeShell.position.y = 0;
+  freezeShell.visible = false;
+  player.add(freezeShell);
+  player.userData.freezeShell = freezeShell;
+  player.userData.frozenUntil = 0;
 
   bossData = {
     ...def,
@@ -54,34 +69,24 @@ function spawnWarden(def) {
     core: parts.core,
     ring: parts.ring,
     shoulders,
-    hammer,
-    shieldMesh,
-    shieldActive: false,
-    damageMultiplier: 1,
+    cannon,
+    phaseHalo,
+    freezeShell,
     phase: 1,
-    phaseLabel: 'HUNT',
-    contactTimer: 0,
-    burstTimer: 1.4,
-    burstShots: 0,
-    burstShotTimer: 0,
-    slamTimer: 3.6,
-    shockwaveTimer: 7.2,
-    radialTimer: 3,
-    reinforcementTimer: 7.5,
-    hazardTimer: 5,
-    vulnerableTimer: 0,
-    lockdownCleared: false,
-    nodes: [],
-    beams: [],
-    shockwaves: [],
-    hazards: [],
-    transients: [],
+    phaseLabel: 'PLASMA ASSAULT',
+    beamTimer: 2,
+    orbTimer: 5,
     activeAttack: null,
+    freezeOrbs: [],
+    clones: [],
+    transients: [freezeShell],
+    contactTimer: 0,
+    freezeGraceUntil: 0,
   };
 
-  flashCenterMsg('WARDEN PROTOCOL · PHASE I: HUNT', '#64e7ff');
+  flashCenterMsg('WARDEN PHASE I · PLASMA BEAM EVERY 2 SECONDS', '#64e7ff');
   triggerScreenShake(0.55);
-  updateWardenArmorUI(bossData);
+  updateWardenUI(bossData);
 }
 
 function updateWarden(delta) {
@@ -89,61 +94,44 @@ function updateWarden(delta) {
   const mesh = bossMesh;
   if (!bd || !mesh) return;
 
-  const hpRatio = bd.currentHp / bd.hp;
-  if (bd.phase === 1 && hpRatio <= 0.6) enterWardenLockdown();
-  if (bd.phase === 2 && hpRatio <= 0.25) enterWardenOverdrive();
+  if (bd.phase === 1 && bd.currentHp / bd.hp <= 0.5) enterWardenClonePhase();
 
   bd.contactTimer = Math.max(0, bd.contactTimer - delta);
-  bd.ring.rotation.z += delta * (bd.phase === 3 ? 3.8 : 1.8);
-  bd.core.rotation.y -= delta * (bd.phase === 3 ? 4.2 : 2.1);
-  bd.shieldMesh.rotation.y += delta * 1.4;
-  bd.shoulders.rotation.y = Math.sin(elapsedTime * 1.8) * 0.035;
-  bd.hammer.rotation.x = Math.sin(elapsedTime * 2.2) * 0.04;
+  bd.ring.rotation.z += delta * (bd.phase === 2 ? 3.2 : 1.9);
+  bd.phaseHalo.rotation.z -= delta * (bd.phase === 2 ? 2.7 : 1.4);
+  bd.core.rotation.y += delta * 2.8;
+  bd.cannon.rotation.z = Math.sin(elapsedTime * 2.5) * 0.045;
 
-  if (bd.phase === 3) updateWardenVulnerability(delta);
-  updateWardenNodes(delta);
-  updateWardenBeams(delta);
-  updateWardenShockwaves(delta);
-  updateWardenHazards(delta);
+  moveWarden(delta);
+  updateWardenClones(delta);
+  updateWardenFreezeOrbs(delta);
+  updateWardenFreezeVisual(delta);
 
-  if (bd.activeAttack) {
-    updateWardenSlam(delta);
-  } else {
-    bd.hammer.rotation.z += (-0.42 - bd.hammer.rotation.z) * Math.min(1, delta * 8);
-    moveWarden(delta);
-    bd.slamTimer -= delta;
-    if (bd.slamTimer <= 0) startWardenSlam();
-  }
-
-  updateWardenBurst(delta);
-
-  bd.shockwaveTimer -= delta;
-  if (bd.shockwaveTimer <= 0) {
-    spawnWardenShockwave();
-    bd.shockwaveTimer = bd.phase === 3 ? 6.2 : (bd.phase === 2 ? 8.2 : 9.4);
-  }
-
-  if (bd.phase >= 2) updateWardenReinforcements(delta);
-  if (bd.phase === 3) {
-    bd.radialTimer -= delta;
-    if (bd.radialTimer <= 0) {
-      fireWardenRadial();
-      bd.radialTimer = 3.25;
+  if (bd.phase === 1) {
+    bd.beamTimer -= delta;
+    if (!bd.activeAttack && bd.beamTimer <= 0) {
+      startWardenPlasmaBeam();
+      bd.beamTimer += 2;
     }
-    bd.hazardTimer -= delta;
-    if (bd.hazardTimer <= 0) {
-      spawnWardenLockZone();
-      bd.hazardTimer = 5.4;
+    if (bd.activeAttack) updateWardenPlasmaBeam(delta);
+  } else {
+    bd.orbTimer -= delta;
+    if (bd.orbTimer <= 0) {
+      fireWardenFreezeVolley();
+      bd.orbTimer += 5;
     }
   }
 
   if (flatDist(mesh.position, player.position) < bd.size * 0.66 && bd.contactTimer <= 0) {
-    hurtPlayer(bd.phase === 3 ? bd.damage + 5 : bd.damage);
+    if (invincibleTimer <= 0) {
+      stats.hp -= bd.damage;
+      triggerHealthFlash();
+    }
     bd.contactTimer = 1;
   }
 
   checkBossProjectileHits(bd, bd.size * 0.68);
-  updateWardenArmorUI(bd);
+  updateWardenUI(bd);
   updateBossHPBar(bd);
   if (bd.currentHp <= 0) killBoss();
 }
@@ -152,518 +140,267 @@ function moveWarden(delta) {
   const bd = bossData;
   const mesh = bossMesh;
   const step = frameScale(delta);
-  let target;
-  let speed = bd.speed;
-
-  if (bd.phase === 2 && !bd.lockdownCleared) {
-    target = new THREE.Vector3(0, mesh.position.y, 0);
-    speed *= 0.72;
-  } else {
-    target = player.position.clone();
-    target.y = mesh.position.y;
-    if (bd.phase === 3) speed *= 2.35;
+  const toPlayer = new THREE.Vector3().subVectors(player.position, mesh.position);
+  toPlayer.y = 0;
+  const distance = toPlayer.length();
+  if (distance > 6.5) {
+    toPlayer.normalize();
+    mesh.position.addScaledVector(toPlayer, bd.speed * step * (bd.phase === 2 ? 1.18 : 1));
+  } else if (distance < 4.2) {
+    toPlayer.normalize();
+    mesh.position.addScaledVector(toPlayer, -bd.speed * step * 0.7);
   }
-
-  const dir = new THREE.Vector3().subVectors(target, mesh.position);
-  dir.y = 0;
-  const distance = dir.length();
-  if (distance > (bd.phase === 2 && !bd.lockdownCleared ? 1.2 : 3.1)) {
-    dir.normalize();
-    mesh.position.addScaledVector(dir, speed * step);
-  }
-  clampToArena(mesh.position, 2.8);
+  clampToArena(mesh.position, 3);
   mesh.lookAt(player.position.x, mesh.position.y, player.position.z);
 }
 
-function updateWardenBurst(delta) {
+function startWardenPlasmaBeam() {
   const bd = bossData;
-  if (bd.activeAttack) return;
-  if (bd.burstShots > 0) {
-    bd.burstShotTimer -= delta;
-    if (bd.burstShotTimer <= 0) {
-      fireWardenBurstRound();
-      bd.burstShots--;
-      bd.burstShotTimer = 0.19;
-    }
-    return;
-  }
+  const direction = new THREE.Vector3().subVectors(player.position, bossMesh.position);
+  direction.y = 0;
+  if (direction.lengthSq() < 0.01) direction.set(1, 0, 0);
+  direction.normalize();
 
-  bd.burstTimer -= delta;
-  if (bd.burstTimer <= 0) {
-    bd.burstShots = 3;
-    bd.burstShotTimer = 0;
-    bd.burstTimer = bd.phase === 3 ? 2.45 : (bd.phase === 2 ? 3.4 : bd.shootInterval);
-  }
-}
-
-function fireWardenBurstRound() {
-  const bd = bossData;
-  const dir = new THREE.Vector3().subVectors(player.position, bossMesh.position);
-  dir.y = 0;
-  if (dir.lengthSq() < 0.01) dir.set(1, 0, 0);
-  dir.normalize();
-  const fired = 3 - bd.burstShots;
-  const spread = (fired - 1) * 0.035;
-  const c = Math.cos(spread), s = Math.sin(spread);
-  dir.set(dir.x * c - dir.z * s, 0, dir.x * s + dir.z * c).normalize();
-  spawnEnemyProjectile(bossMesh.position.clone(), dir, {
-    speed: bd.projectileSpeed * (bd.phase === 3 ? 1.18 : 1),
-    damage: bd.projectileDamage + (bd.phase === 3 ? 4 : 0),
-    color: 0x64e7ff,
-    size: 0.16,
-  });
-  AudioManager.enemyShoot();
-}
-
-function startWardenSlam() {
-  const bd = bossData;
-  const radius = bd.phase === 3 ? 6.6 : (bd.phase === 2 ? 5.2 : 4.6);
-  const warning = new THREE.Group();
-  const fill = new THREE.Mesh(
-    new THREE.CircleGeometry(radius, getGameSettings().quality === 'low' ? 24 : 48),
-    new THREE.MeshBasicMaterial({ color: 0xff243d, transparent: true, opacity: 0.16, side: THREE.DoubleSide })
-  );
-  fill.rotation.x = -Math.PI / 2;
-  const rim = new THREE.Mesh(
-    new THREE.RingGeometry(radius - 0.16, radius, getGameSettings().quality === 'low' ? 24 : 48),
-    new THREE.MeshBasicMaterial({ color: 0xff1838, transparent: true, opacity: 0.94, side: THREE.DoubleSide })
-  );
-  rim.rotation.x = -Math.PI / 2;
-  warning.add(fill, rim);
-  warning.position.set(bossMesh.position.x, 0.055, bossMesh.position.z);
-  scene.add(warning);
-
-  const duration = bd.phase === 3 ? 0.9 : 1.05;
-  bd.activeAttack = { type: 'warden-slam', mesh: warning, timer: duration, duration, radius };
-  bd.burstShots = 0;
-  flashCenterMsg('⚠ GROUND SLAM · CLEAR THE RED ZONE ⚠', '#ff3d55');
-}
-
-function updateWardenSlam(delta) {
-  const bd = bossData;
-  const slam = bd.activeAttack;
-  if (!slam) return;
-  slam.timer -= delta;
-  const progress = 1 - Math.max(0, slam.timer) / slam.duration;
-  const pulse = 1 + Math.sin(progress * Math.PI * 8) * 0.035;
-  slam.mesh.scale.set(pulse, 1, pulse);
-  slam.mesh.traverse(child => {
-    if (child.material) child.material.opacity = child.geometry?.type === 'RingGeometry'
-      ? 0.72 + progress * 0.28
-      : 0.1 + progress * 0.24;
-  });
-  bd.hammer.rotation.z = -0.42 - progress * 1.12;
-
-  if (slam.timer > 0) return;
-  const center = bossMesh.position.clone();
-  if (flatDist(center, player.position) <= slam.radius) hurtPlayer(bd.damage + (bd.phase === 3 ? 10 : 0));
-  removeAndDispose(slam.mesh);
-  bd.activeAttack = null;
-  bd.hammer.rotation.z = 0.28;
-  triggerScreenShake(bd.phase === 3 ? 0.8 : 0.58);
-  AudioManager.explosion();
-  spawnDeathParticles(center.clone().setY(0.2), 0xff334f);
-  spawnWardenSlamHazard(center, slam.radius);
-
-  if (bd.phase === 3) openWardenArmor();
-  bd.slamTimer = bd.phase === 3 ? 4.6 : (bd.phase === 2 ? 6 : 6.7);
-}
-
-function spawnWardenSlamHazard(center, slamRadius) {
-  const bd = bossData;
-  const radius = slamRadius * (bd.phase === 3 ? 0.68 : 0.55);
-  const mesh = new THREE.Mesh(
-    new THREE.CircleGeometry(radius, getGameSettings().quality === 'low' ? 20 : 40),
-    new THREE.MeshBasicMaterial({ color: 0xb90f2d, transparent: true, opacity: 0.24, side: THREE.DoubleSide })
-  );
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.position.set(center.x, 0.035, center.z);
-  scene.add(mesh);
-  const hazard = { mesh, radius, timer: bd.phase === 3 ? 3.2 : 2.2, maxTimer: bd.phase === 3 ? 3.2 : 2.2, hitCooldown: 0, state: 'active' };
-  bd.hazards.push(hazard);
-  bd.transients.push(mesh);
-}
-
-function enterWardenLockdown() {
-  const bd = bossData;
-  bd.phase = 2;
-  bd.phaseLabel = 'LOCKDOWN';
-  bd.damageMultiplier = 0.15;
-  bd.shieldActive = true;
-  bd.burstShots = 0;
-  bd.slamTimer = 3.2;
-  bd.reinforcementTimer = 2.2;
-  spawnWardenNodes();
-  flashCenterMsg('PHASE II: LOCKDOWN · DESTROY ALL FOUR NODES', '#64e7ff');
-  triggerColorFlash('rgba(57,217,255,0.32)', 120, 480);
-  triggerScreenShake(0.72);
-}
-
-function spawnWardenNodes() {
-  const bd = bossData;
-  const positions = [
-    new THREE.Vector3(10.8, 0, 0),
-    new THREE.Vector3(0, 0, 10.8),
-    new THREE.Vector3(-10.8, 0, 0),
-    new THREE.Vector3(0, 0, -10.8),
-  ];
-  for (let i = 0; i < positions.length; i++) {
-    const node = buildWardenNode(positions[i], i);
-    bd.nodes.push(node);
-    enemies.push(node.mesh); // Nodes participate in every weapon's standard targeting/damage path.
-    scene.add(node.mesh);
-  }
-}
-
-function buildWardenNode(position, index) {
-  const group = new THREE.Group();
-  const shellMat = new THREE.MeshStandardMaterial({
-    color: 0x133552, emissive: 0x126a88, emissiveIntensity: 0.8,
-    metalness: 0.75, roughness: 0.25, flatShading: true,
-  });
-  const glowMat = new THREE.MeshStandardMaterial({
-    color: 0x83f2ff, emissive: 0x39d9ff, emissiveIntensity: 2.2,
-    metalness: 0.25, roughness: 0.2,
-  });
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.95, 0.42, 8), shellMat);
-  base.position.y = 0.22;
-  const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.62, 0), glowMat);
-  core.position.y = 1.2;
-  const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(0.9, 0.07, 6, 24),
-    new THREE.MeshBasicMaterial({ color: 0x64e7ff, transparent: true, opacity: 0.86 })
-  );
-  ring.position.y = 1.2;
-  ring.rotation.x = Math.PI / 2;
-  group.add(base, core, ring);
-  group.position.copy(position);
-  group.material = glowMat;
-  group.userData = {
-    type: 'warden-node', hp: 220, maxHp: 220, speed: 0, damage: 0, coins: 0,
-    spawning: false, shieldedUntil: 0, wardenNode: true,
-  };
-  setObjectShadows(group, getGameSettings().quality !== 'low');
-  return { mesh: group, core, ring, index, beamTimer: 1.8 + index * 0.82, destroyed: false };
-}
-
-function updateWardenNodes(delta) {
-  const bd = bossData;
-  if (!bd.nodes.length || bd.lockdownCleared) return;
-  let remaining = 0;
-  for (const node of bd.nodes) {
-    if (node.destroyed) continue;
-    if (!node.mesh.parent || node.mesh.userData.hp <= 0) {
-      destroyWardenNode(node);
-      continue;
-    }
-    remaining++;
-    node.core.rotation.y += delta * 3.4;
-    node.ring.rotation.z += delta * (node.index % 2 ? -2.2 : 2.2);
-    const hpRatio = Math.max(0, node.mesh.userData.hp / node.mesh.userData.maxHp);
-    node.core.scale.setScalar(0.72 + hpRatio * 0.28 + Math.sin(elapsedTime * 7 + node.index) * 0.035);
-    node.beamTimer -= delta;
-    if (node.beamTimer <= 0 && bd.beams.length < 2) {
-      startWardenNodeBeam(node);
-      node.beamTimer = 5.2 + node.index * 0.18;
-    }
-  }
-
-  // Recount after destruction so the armor opens on the exact killing frame.
-  remaining = bd.nodes.filter(node => !node.destroyed).length;
-  if (remaining === 0) clearWardenLockdown();
-}
-
-function destroyWardenNode(node, silent = false) {
-  if (!node || node.destroyed) return;
-  node.destroyed = true;
-  const pos = node.mesh.position.clone();
-  const enemyIndex = enemies.indexOf(node.mesh);
-  if (enemyIndex >= 0) enemies.splice(enemyIndex, 1);
-  for (let i = bossData.beams.length - 1; i >= 0; i--) {
-    if (bossData.beams[i].node !== node) continue;
-    removeWardenTransient(bossData.beams[i].mesh);
-    bossData.beams.splice(i, 1);
-  }
-  removeAndDispose(node.mesh);
-  if (!silent) {
-    spawnDeathParticles(pos, 0x64e7ff);
-    triggerScreenShake(0.32);
-    AudioManager.explosion();
-  }
-}
-
-function clearWardenLockdown() {
-  const bd = bossData;
-  if (bd.lockdownCleared) return;
-  bd.lockdownCleared = true;
-  bd.damageMultiplier = 1;
-  bd.shieldActive = false;
-  bd.shieldMesh.material.opacity = 0;
-  document.getElementById('boss-shield-bar').style.display = 'none';
-  flashCenterMsg('LOCKDOWN BROKEN · WARDEN EXPOSED', '#ffd23d');
-  triggerColorFlash('rgba(255,210,61,0.25)', 90, 360);
-}
-
-function startWardenNodeBeam(node) {
-  const bd = bossData;
-  const dir = node.mesh.position.clone().multiplyScalar(-1);
-  dir.y = 0;
-  dir.normalize();
-  const length = CONFIG.ARENA_RADIUS * 1.85;
-  const geometry = new THREE.BoxGeometry(length, 0.04, 0.22);
+  const length = CONFIG.ARENA_RADIUS * 2;
+  const geometry = new THREE.BoxGeometry(length, 0.12, 0.17);
   geometry.translate(length / 2, 0, 0);
   const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
-    color: 0x3fe5ff, transparent: true, opacity: 0.2,
+    color: 0x56efff, transparent: true, opacity: 0.22,
   }));
-  mesh.position.copy(node.mesh.position);
-  mesh.position.y = 0.1;
-  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), dir);
   scene.add(mesh);
-  const beam = { mesh, node, dir, timer: 0.95, fired: false };
-  bd.beams.push(beam);
-  bd.transients.push(mesh);
+  bd.activeAttack = {
+    type: 'warden-plasma-beam', mesh, direction,
+    state: 'warning', timer: 0.55, hit: false,
+  };
+  orientWardenPlasmaBeam(bd.activeAttack);
 }
 
-function updateWardenBeams(delta) {
+function orientWardenPlasmaBeam(beam) {
+  beam.mesh.position.copy(bossMesh.position);
+  beam.mesh.position.y = 0.78;
+  beam.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), beam.direction);
+}
+
+function updateWardenPlasmaBeam(delta) {
   const bd = bossData;
-  for (let i = bd.beams.length - 1; i >= 0; i--) {
-    const beam = bd.beams[i];
-    beam.timer -= delta;
-    beam.mesh.material.opacity = beam.fired ? 0.96 : 0.18 + Math.sin(elapsedTime * 28) * 0.1;
-    beam.mesh.scale.z = beam.fired ? 7.4 : 0.85 + Math.max(0, 0.95 - beam.timer) * 1.5;
-    if (!beam.fired && beam.timer <= 0) {
-      beam.fired = true;
-      beam.timer = 0.24;
-      triggerScreenShake(0.44);
+  const beam = bd.activeAttack;
+  if (!beam) return;
+  beam.timer -= delta;
+  orientWardenPlasmaBeam(beam);
+
+  if (beam.state === 'warning') {
+    beam.mesh.material.opacity = 0.16 + Math.sin(elapsedTime * 32) * 0.1;
+    beam.mesh.scale.z = 0.75 + Math.max(0, 0.55 - beam.timer) * 1.8;
+    if (beam.timer <= 0) {
+      beam.state = 'firing';
+      beam.timer = 0.14;
+      beam.mesh.material.opacity = 1;
+      beam.mesh.scale.z = 7.5;
+      triggerScreenShake(0.45);
       AudioManager.explosion();
-      const toPlayer = new THREE.Vector3().subVectors(player.position, beam.node.mesh.position);
+
+      const toPlayer = new THREE.Vector3().subVectors(player.position, bossMesh.position);
       toPlayer.y = 0;
-      const along = toPlayer.dot(beam.dir);
-      const perp = toPlayer.clone().sub(beam.dir.clone().multiplyScalar(along)).length();
-      if (along >= 0 && along <= CONFIG.ARENA_RADIUS * 1.85 && perp < 1.05) hurtPlayer(34);
-    } else if (beam.fired && beam.timer <= 0) {
-      removeWardenTransient(beam.mesh);
-      bd.beams.splice(i, 1);
+      const along = toPlayer.dot(beam.direction);
+      const perpendicular = toPlayer.clone().sub(beam.direction.clone().multiplyScalar(along)).length();
+      if (along >= 0 && along <= CONFIG.ARENA_RADIUS * 2 && perpendicular < 0.9 && invincibleTimer <= 0) {
+        stats.hp -= 32;
+        triggerHealthFlash();
+      }
     }
+    return;
+  }
+
+  beam.mesh.material.opacity = Math.max(0, beam.timer / 0.14);
+  if (beam.timer <= 0) {
+    removeAndDispose(beam.mesh);
+    bd.activeAttack = null;
   }
 }
 
-function enterWardenOverdrive() {
+function enterWardenClonePhase() {
   const bd = bossData;
-  bd.phase = 3;
-  bd.phaseLabel = 'OVERDRIVE';
-  bd.vulnerableTimer = 0;
-  bd.damageMultiplier = 0.15;
-  bd.shieldActive = true;
-  bd.slamTimer = 1.5;
-  bd.shockwaveTimer = 3.6;
-  bd.radialTimer = 1.4;
-  bd.reinforcementTimer = 2.8;
-  bd.hazardTimer = 2.7;
-  for (const node of bd.nodes) destroyWardenNode(node, true);
-  bd.lockdownCleared = true;
-  flashCenterMsg('PHASE III: OVERDRIVE · DODGE SLAM → PUNISH', '#ff3d55');
-  triggerColorFlash('rgba(255,35,70,0.34)', 140, 520);
-  triggerScreenShake(0.9);
+  bd.phase = 2;
+  bd.phaseLabel = 'CRYO MIRROR';
+  bd.orbTimer = 5;
+  if (bd.activeAttack?.mesh) removeAndDispose(bd.activeAttack.mesh);
+  bd.activeAttack = null;
+  spawnWardenClones();
+  flashCenterMsg('WARDEN PHASE II · TWO CLONES ONLINE · CRYO ORBS', '#9ef7ff');
+  triggerColorFlash('rgba(100,231,255,0.32)', 120, 480);
+  triggerScreenShake(0.75);
 }
 
-function updateWardenVulnerability(delta) {
+function spawnWardenClones() {
   const bd = bossData;
-  if (bd.vulnerableTimer <= 0) return;
-  bd.vulnerableTimer = Math.max(0, bd.vulnerableTimer - delta);
-  if (bd.vulnerableTimer > 0) {
-    bd.damageMultiplier = 1.35;
-    bd.shieldActive = false;
-    bd.shieldMesh.material.opacity = 0.04;
-  } else {
-    bd.damageMultiplier = 0.15;
-    bd.shieldActive = true;
-    bd.shieldMesh.material.opacity = 0.38;
-    flashCenterMsg('WARDEN ARMOR RESTORED', '#64e7ff');
+  for (let i = 0; i < 2; i++) {
+    const mesh = cloneWardenProjection(bossMesh);
+    const angle = i * Math.PI;
+    mesh.position.copy(bossMesh.position).add(new THREE.Vector3(Math.cos(angle) * 4.5, 0, Math.sin(angle) * 4.5));
+    scene.add(mesh);
+    const clone = {
+      mesh,
+      angleOffset: angle,
+      cannon: findWardenCloneCannon(mesh),
+    };
+    bd.clones.push(clone);
+    bd.transients.push(mesh);
   }
 }
 
-function openWardenArmor() {
-  const bd = bossData;
-  bd.vulnerableTimer = 3.15;
-  bd.damageMultiplier = 1.35;
-  bd.shieldActive = false;
-  bd.shieldMesh.material.opacity = 0.04;
-  flashCenterMsg('ARMOR BREACH · DAMAGE WINDOW OPEN', '#ffd23d');
-  triggerColorFlash('rgba(255,210,61,0.2)', 70, 280);
+function cloneWardenProjection(source) {
+  const clone = source.clone(true);
+  clone.traverse(child => {
+    if (!child.isMesh) return;
+    if (child.geometry) child.geometry = child.geometry.clone();
+    if (Array.isArray(child.material)) {
+      child.material = child.material.map(material => makeWardenCloneMaterial(material));
+    } else if (child.material) {
+      child.material = makeWardenCloneMaterial(child.material);
+    }
+    child.castShadow = false;
+    child.receiveShadow = false;
+  });
+  clone.scale.multiplyScalar(0.9);
+  return clone;
 }
 
-function fireWardenRadial() {
-  const bd = bossData;
-  const count = 12;
-  const offset = elapsedTime * 0.55;
-  for (let i = 0; i < count; i++) {
-    const angle = offset + i / count * Math.PI * 2;
-    spawnEnemyProjectile(bossMesh.position.clone(), new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle)), {
-      speed: bd.projectileSpeed * 1.08,
-      damage: bd.projectileDamage + 3,
-      color: i % 3 === 0 ? 0xff5269 : 0x64e7ff,
-      size: 0.15,
-    });
+function makeWardenCloneMaterial(source) {
+  const material = source.clone();
+  material.transparent = true;
+  material.opacity = source.opacity === 0 ? 0 : Math.min(0.52, source.opacity ?? 1);
+  material.depthWrite = false;
+  if (material.color) material.color.lerp(new THREE.Color(0x7feaff), 0.38);
+  if (material.emissive) {
+    material.emissive.lerp(new THREE.Color(0x39d9ff), 0.55);
+    material.emissiveIntensity = Math.max(1.15, material.emissiveIntensity || 0);
   }
+  return material;
+}
+
+function findWardenCloneCannon(mesh) {
+  let cannon = null;
+  mesh.traverse(child => {
+    if (child.userData?.wardenCannon) cannon = child;
+  });
+  return cannon;
+}
+
+function updateWardenClones(delta) {
+  const bd = bossData;
+  if (bd.phase !== 2) return;
+  for (let i = 0; i < bd.clones.length; i++) {
+    const clone = bd.clones[i];
+    const angle = elapsedTime * (i ? -0.38 : 0.38) + clone.angleOffset;
+    const desired = bossMesh.position.clone().add(new THREE.Vector3(Math.cos(angle) * 5.1, 0, Math.sin(angle) * 5.1));
+    clone.mesh.position.lerp(desired, frameLerp(0.055, delta));
+    clampToArena(clone.mesh.position, 2.5);
+    clone.mesh.lookAt(player.position.x, clone.mesh.position.y, player.position.z);
+    clone.mesh.rotation.z = Math.sin(elapsedTime * 3 + i) * 0.025;
+    if (clone.cannon) clone.cannon.rotation.z = Math.sin(elapsedTime * 3.4 + i) * 0.06;
+  }
+}
+
+function fireWardenFreezeVolley() {
+  const sources = [bossMesh, ...bossData.clones.map(clone => clone.mesh)];
+  for (const source of sources) spawnWardenFreezeOrb(source);
+  flashCenterMsg('CRYO ORBS · KEEP MOVING', '#9ef7ff');
   AudioManager.enemyShoot();
 }
 
-function spawnWardenShockwave() {
-  const bd = bossData;
-  const mesh = new THREE.Mesh(
-    new THREE.RingGeometry(0.82, 1, getGameSettings().quality === 'low' ? 28 : 56),
-    new THREE.MeshBasicMaterial({ color: 0xff5368, transparent: true, opacity: 0.88, side: THREE.DoubleSide })
+function spawnWardenFreezeOrb(source) {
+  const group = new THREE.Group();
+  const core = new THREE.Mesh(
+    new THREE.SphereGeometry(0.28, 10, 8),
+    new THREE.MeshBasicMaterial({ color: 0xc9fbff })
   );
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.position.set(bossMesh.position.x, 0.09, bossMesh.position.z);
-  scene.add(mesh);
-  const origin = bossMesh.position.clone();
-  const shockwave = {
-    mesh, origin, radius: 1, maxRadius: bd.phase === 3 ? 16 : 15,
-    speed: bd.phase === 3 ? 11.8 : 10.2, charge: 0.5,
-    resolved: false, lastPlayerDistance: flatDist(origin, player.position),
-  };
-  bd.shockwaves.push(shockwave);
-  bd.transients.push(mesh);
-  flashCenterMsg('EXPANDING SHOCKWAVE · MOVE OUT OR CUT IN', '#ff6b7f');
-}
-
-function updateWardenShockwaves(delta) {
-  const bd = bossData;
-  for (let i = bd.shockwaves.length - 1; i >= 0; i--) {
-    const wave = bd.shockwaves[i];
-    if (wave.charge > 0) {
-      wave.charge -= delta;
-      wave.mesh.scale.setScalar(1 + Math.sin(elapsedTime * 24) * 0.15);
-      wave.lastPlayerDistance = flatDist(wave.origin, player.position);
-      continue;
-    }
-    wave.radius += wave.speed * delta;
-    wave.mesh.scale.setScalar(wave.radius);
-    wave.mesh.material.opacity = Math.max(0, 0.92 * (1 - wave.radius / wave.maxRadius * 0.55));
-    const playerDistance = flatDist(wave.origin, player.position);
-    if (!wave.resolved && Math.abs(playerDistance - wave.radius) < 0.72) {
-      const movingInward = playerDistance < wave.lastPlayerDistance - Math.max(0.012, delta * 1.4);
-      wave.resolved = true;
-      if (movingInward) {
-        spawnDeathParticles(player.position.clone(), 0x64e7ff);
-      } else {
-        hurtPlayer(bd.phase === 3 ? 34 : 27);
-      }
-    }
-    wave.lastPlayerDistance = playerDistance;
-    if (wave.radius >= wave.maxRadius) {
-      removeWardenTransient(wave.mesh);
-      bd.shockwaves.splice(i, 1);
-    }
-  }
-}
-
-function spawnWardenLockZone() {
-  const bd = bossData;
-  const radius = 2.7;
-  const mesh = new THREE.Mesh(
-    new THREE.CircleGeometry(radius, getGameSettings().quality === 'low' ? 20 : 36),
-    new THREE.MeshBasicMaterial({ color: 0xff1838, transparent: true, opacity: 0.12, side: THREE.DoubleSide })
+  const glow = new THREE.Mesh(
+    new THREE.SphereGeometry(0.52, 10, 8),
+    new THREE.MeshBasicMaterial({
+      color: 0x56eaff, transparent: true, opacity: 0.22,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    })
   );
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.position.set(player.position.x, 0.045, player.position.z);
-  scene.add(mesh);
-  const hazard = { mesh, radius, timer: 1, maxTimer: 3.6, hitCooldown: 0, state: 'warning' };
-  bd.hazards.push(hazard);
-  bd.transients.push(mesh);
+  const cage = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(0.4, 0),
+    new THREE.MeshBasicMaterial({ color: 0x72efff, wireframe: true, transparent: true, opacity: 0.8 })
+  );
+  group.add(core, glow, cage);
+  group.position.copy(source.position);
+  group.position.y = 0.78;
+
+  const direction = new THREE.Vector3().subVectors(player.position, group.position);
+  direction.y = 0;
+  if (direction.lengthSq() < 0.01) direction.set(1, 0, 0);
+  direction.normalize();
+  scene.add(group);
+
+  const orb = { mesh: group, glow, cage, direction, speed: 0.115, life: 5.2 };
+  bossData.freezeOrbs.push(orb);
+  bossData.transients.push(group);
 }
 
-function updateWardenHazards(delta) {
+function updateWardenFreezeOrbs(delta) {
   const bd = bossData;
-  for (let i = bd.hazards.length - 1; i >= 0; i--) {
-    const hazard = bd.hazards[i];
-    hazard.timer -= delta;
-    hazard.hitCooldown = Math.max(0, hazard.hitCooldown - delta);
-    if (hazard.state === 'warning') {
-      hazard.mesh.material.opacity = 0.1 + Math.sin(elapsedTime * 24) * 0.07;
-      if (hazard.timer <= 0) {
-        hazard.state = 'active';
-        hazard.timer = hazard.maxTimer;
-        hazard.mesh.material.opacity = 0.38;
+  const step = frameScale(delta);
+  for (let i = bd.freezeOrbs.length - 1; i >= 0; i--) {
+    const orb = bd.freezeOrbs[i];
+    orb.mesh.position.addScaledVector(orb.direction, orb.speed * step);
+    orb.mesh.position.y = 0.78;
+    orb.mesh.rotation.y += delta * 4;
+    orb.cage.rotation.x += delta * 3.2;
+    orb.cage.rotation.z -= delta * 2.4;
+    orb.glow.scale.setScalar(0.88 + Math.sin(elapsedTime * 12 + i) * 0.16);
+    orb.life -= delta;
+
+    if (flatDist(orb.mesh.position, player.position) < 0.72) {
+      if (elapsedTime >= bd.freezeGraceUntil && invincibleTimer <= 0) {
+        stats.hp -= 12;
+        bd.freezeGraceUntil = elapsedTime + 0.65;
+        freezeWardenPlayer(1.35);
+        triggerHealthFlash();
         triggerScreenShake(0.25);
       }
+      removeWardenTransient(orb.mesh);
+      bd.freezeOrbs.splice(i, 1);
       continue;
     }
 
-    hazard.mesh.material.opacity = Math.max(0.05, 0.34 * hazard.timer / hazard.maxTimer);
-    if (flatDist(hazard.mesh.position, player.position) < hazard.radius && hazard.hitCooldown <= 0) {
-      hurtPlayer(bd.phase === 3 ? 18 : 12);
-      hazard.hitCooldown = 0.7;
-    }
-    if (hazard.timer <= 0) {
-      removeWardenTransient(hazard.mesh);
-      bd.hazards.splice(i, 1);
+    if (orb.life <= 0) {
+      removeWardenTransient(orb.mesh);
+      bd.freezeOrbs.splice(i, 1);
     }
   }
 }
 
-function updateWardenReinforcements(delta) {
-  const bd = bossData;
-  bd.reinforcementTimer -= delta;
-  if (bd.reinforcementTimer > 0) return;
-  const activeEnemies = enemies.filter(enemy => !enemy.userData.wardenNode).length;
-  const limit = bd.phase === 3 ? 10 : 7;
-  if (activeEnemies < limit) summonWardenReinforcements(bd.phase === 3 ? 3 : 2);
-  bd.reinforcementTimer = bd.phase === 3 ? 6.7 : 9.2;
+function freezeWardenPlayer(duration) {
+  player.userData.frozenUntil = Math.max(player.userData.frozenUntil || 0, elapsedTime + duration);
+  if (bossData.freezeShell) bossData.freezeShell.visible = true;
+  triggerColorFlash('rgba(110,238,255,0.28)', 80, 300);
+  flashCenterMsg('CRYO LOCK · FROZEN', '#9ef7ff');
 }
 
-function summonWardenReinforcements(count) {
-  const pool = bossData.phase === 3
-    ? ['dasher', 'shooter', 'splitter', 'fast']
-    : ['basic', 'shooter', 'dasher', 'fast'];
-  for (let i = 0; i < count; i++) {
-    const angle = i / count * Math.PI * 2 + elapsedTime * 0.2;
-    const pos = new THREE.Vector3(Math.cos(angle) * 13, 0, Math.sin(angle) * 13);
-    spawnEnemyAt(pool[(i + Math.floor(elapsedTime)) % pool.length], pos, {
-      hpMult: bossData.phase === 3 ? 1.2 : 1.05,
-      spawnDuration: 0.55,
-    });
+function updateWardenFreezeVisual(delta) {
+  const shell = bossData.freezeShell;
+  if (!shell) return;
+  const frozen = isPlayerFrozen();
+  shell.visible = frozen;
+  if (frozen) {
+    shell.rotation.y += delta * 2.8;
+    shell.rotation.x -= delta * 1.5;
+    shell.material.opacity = 0.42 + Math.sin(elapsedTime * 16) * 0.12;
   }
-  flashCenterMsg('WARDEN REINFORCEMENTS INBOUND', '#ffb14a');
 }
 
-function updateWardenArmorUI(bd) {
+function updateWardenUI(bd) {
   const shieldBar = document.getElementById('boss-shield-bar');
-  const shieldFill = document.getElementById('boss-shield-fill');
   const name = document.getElementById('boss-name');
-  if (!shieldBar || !shieldFill || !name) return;
-
-  if (bd.phase === 1 || (bd.phase === 2 && bd.lockdownCleared)) {
-    shieldBar.style.display = 'none';
-    name.textContent = `THE WARDEN · ${bd.phaseLabel}`;
-    return;
+  if (shieldBar) shieldBar.style.display = 'none';
+  if (name) {
+    name.textContent = bd.phase === 1
+      ? 'THE WARDEN · PLASMA ASSAULT'
+      : 'THE WARDEN · CRYO MIRROR · 2 CLONES';
   }
-
-  if (bd.phase === 2) {
-    const remaining = bd.nodes.filter(node => !node.destroyed).length;
-    shieldBar.style.display = 'block';
-    shieldFill.style.width = `${remaining / 4 * 100}%`;
-    name.textContent = `THE WARDEN · LOCKDOWN · ${remaining} NODE${remaining === 1 ? '' : 'S'}`;
-    return;
-  }
-
-  if (bd.vulnerableTimer > 0) {
-    shieldBar.style.display = 'none';
-    name.textContent = `THE WARDEN · ARMOR OPEN · ${bd.vulnerableTimer.toFixed(1)}s`;
-  } else {
-    shieldBar.style.display = 'block';
-    shieldFill.style.width = '100%';
-    name.textContent = 'THE WARDEN · OVERDRIVE · ARMOR INTACT';
-  }
-}
-
-function hurtPlayer(amount) {
-  if (invincibleTimer > 0) return false;
-  stats.hp -= amount;
-  triggerHealthFlash();
-  return true;
 }
 
 function removeWardenTransient(mesh) {

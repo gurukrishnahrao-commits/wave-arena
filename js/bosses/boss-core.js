@@ -21,10 +21,9 @@ const BOSS_DEFS = [
     slamRange: 5, slamCooldown: 2.5,
   },
   {
-    name: 'THE WARDEN — AREA-LOCK PROTOCOL', type: 'warden',
+    name: 'THE WARDEN — CRYO-MIRROR PROTOCOL', type: 'warden',
     color: 0x17263d, emissive: 0x173f66, coreColor: 0x39d9ff,
     hp: 5000, size: 3.05, speed: 0.026, damage: 38, coins: 1000,
-    shootInterval: 3.1, projectileSpeed: 0.17, projectileDamage: 18,
   },
   {
     name: 'THE AETHER REGENT', type: 'aetherregent',
@@ -127,9 +126,23 @@ function updateBoss(delta) {
   updateColossusBoss(delta);
 }
 
+function clearBossPlayerEffects() {
+  if (!player?.userData) return;
+  const freezeShell = player.userData.freezeShell;
+  if (freezeShell) {
+    if (bossData?.transients) {
+      bossData.transients = bossData.transients.filter(entry => (entry.mesh || entry) !== freezeShell);
+    }
+    removeAndDispose(freezeShell);
+    delete player.userData.freezeShell;
+  }
+  player.userData.frozenUntil = 0;
+}
+
 function killBoss() {
   if (bossDeathInProgress || !bossMesh || !bossData) return;
   bossDeathInProgress = true;
+  clearBossPlayerEffects();
   bossActive = false;
   document.getElementById('boss-bar').style.display = 'none';
 
@@ -150,17 +163,9 @@ function killBoss() {
   const deathShockwaves = bossData.shockwaves || [];
   const deathAcidProj = bossData.acidProjectiles || [];
   const deathTransients = bossData.transients || [];
-  const deathNodes = bossData.nodes || [];
   const deathActiveAttack = bossData.activeAttack;
   const dyingMesh = bossMesh;
   const deathEffectId = ++bossEffectId;
-  for (const node of deathNodes) {
-    if (!node.mesh || node.destroyed) continue;
-    const enemyIndex = enemies.indexOf(node.mesh);
-    if (enemyIndex >= 0) enemies.splice(enemyIndex, 1);
-    removeAndDispose(node.mesh);
-    node.destroyed = true;
-  }
   for (const transient of deathTransients) {
     const mesh = transient && transient.mesh ? transient.mesh : transient;
     if (mesh) removeAndDispose(mesh);

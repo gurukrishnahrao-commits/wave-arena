@@ -85,17 +85,23 @@ function initPlayer() {
   player.add(glow);
 }
 
+function isPlayerFrozen() {
+  return !!player && (player.userData?.frozenUntil || 0) > elapsedTime;
+}
+
 function updatePlayer(delta) {
   const step = frameScale(delta);
   let dx = 0, dz = 0;
-  if (keys['w'] || keys['arrowup']) dz -= 1;
-  if (keys['s'] || keys['arrowdown']) dz += 1;
-  if (keys['a'] || keys['arrowleft']) dx -= 1;
-  if (keys['d'] || keys['arrowright']) dx += 1;
+  if (!isPlayerFrozen()) {
+    if (keys['w'] || keys['arrowup']) dz -= 1;
+    if (keys['s'] || keys['arrowdown']) dz += 1;
+    if (keys['a'] || keys['arrowleft']) dx -= 1;
+    if (keys['d'] || keys['arrowright']) dx += 1;
 
-  if (joystickInput.x !== 0 || joystickInput.y !== 0) {
-    dx = joystickInput.x;
-    dz = joystickInput.y;
+    if (joystickInput.x !== 0 || joystickInput.y !== 0) {
+      dx = joystickInput.x;
+      dz = joystickInput.y;
+    }
   }
 
   if (dx !== 0 || dz !== 0) {

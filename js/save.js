@@ -425,9 +425,10 @@ function cleanupBoss() {
   sentinelIntroId++;
   hiveIntroId++;
   bossDeathInProgress = false;
+  clearBossPlayerEffects();
   if (bossData) {
     const disposed = new Set();
-    const arrayKeys = ['nests', 'eggs', 'puddles', 'shockwaves', 'acidProjectiles', 'hazards', 'transients', 'mines', 'beams', 'warnings', 'nodes'];
+    const arrayKeys = ['nests', 'eggs', 'puddles', 'shockwaves', 'acidProjectiles', 'hazards', 'transients', 'mines', 'beams', 'warnings'];
     for (const key of arrayKeys) {
       for (const entry of (bossData[key] || [])) {
         if (entry.bubbles) {
@@ -439,10 +440,6 @@ function cleanupBoss() {
         }
         const mesh = entry.mesh || entry;
         if (!mesh || disposed.has(mesh)) continue;
-        if (mesh.userData?.wardenNode) {
-          const enemyIndex = enemies.indexOf(mesh);
-          if (enemyIndex >= 0) enemies.splice(enemyIndex, 1);
-        }
         disposed.add(mesh);
         removeAndDispose(mesh);
       }
