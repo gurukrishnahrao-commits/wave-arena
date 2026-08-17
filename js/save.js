@@ -20,6 +20,7 @@ const metaProgress = {
   highestWave: 0,
   totalKills: 0,
   bossesDefeated: 0,
+  bossMilestones: {},
   victories: 0,
   bestTime: 0,
   tutorialComplete: false,
@@ -33,6 +34,7 @@ const ACHIEVEMENTS = [
   { id: 'first_blood', name: 'FIRST BLOOD', desc: 'Defeat your first enemy.', reward: 5, test: m => m.totalKills >= 1 },
   { id: 'wave_five', name: 'GATECRASHER', desc: 'Reach wave 5.', reward: 15, test: m => m.highestWave >= 5 },
   { id: 'boss_breaker', name: 'BOSS BREAKER', desc: 'Defeat an arena boss.', reward: 20, test: m => m.bossesDefeated >= 1 },
+  { id: 'cut_the_thread', name: 'CUT THE THREAD', desc: 'Defeat the Null Reaver on wave 15.', reward: 40, test: m => !!m.bossMilestones?.wave_15 },
   { id: 'hunter', name: 'HUNDRED DOWN', desc: 'Defeat 100 enemies across all runs.', reward: 25, test: m => m.totalKills >= 100 },
   { id: 'wave_ten', name: 'DEEP RUN', desc: 'Reach wave 10.', reward: 30, test: m => m.highestWave >= 10 },
   { id: 'wave_twenty', name: 'LAST SECTOR', desc: 'Reach wave 20.', reward: 50, test: m => m.highestWave >= 20 },
@@ -82,6 +84,7 @@ function normalizeMeta(raw) {
   metaProgress.highestWave = Number(metaProgress.highestWave) || 0;
   metaProgress.totalKills = Number(metaProgress.totalKills) || 0;
   metaProgress.bossesDefeated = Number(metaProgress.bossesDefeated) || 0;
+  metaProgress.bossMilestones = { ...(safe.bossMilestones || {}) };
   metaProgress.victories = Number(metaProgress.victories) || 0;
   metaProgress.bestTime = Number(metaProgress.bestTime) || 0;
   metaProgress.achievements = { ...(safe.achievements || {}) };
@@ -146,6 +149,7 @@ function recordWaveReached(wave) {
 
 function recordBossDefeat() {
   metaProgress.bossesDefeated++;
+  metaProgress.bossMilestones[`wave_${waveNumber}`] = true;
   const reward = 12 + Math.floor(waveNumber * 1.4);
   metaProgress.cores += reward;
   checkAchievements(false);

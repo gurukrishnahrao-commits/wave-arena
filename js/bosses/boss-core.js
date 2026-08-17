@@ -21,8 +21,8 @@ const BOSS_DEFS = [
     slamRange: 5, slamCooldown: 2.5,
   },
   {
-    name: 'THE VOID REAVER', type: 'voidreaver',
-    color: 0x35105f, emissive: 0x18002f, coreColor: 0xff3df2,
+    name: 'THE NULL REAVER — RIFT-CLASS EXECUTIONER', type: 'voidreaver',
+    color: 0x0b0613, emissive: 0x6d0b78, coreColor: 0xff3df2,
     hp: 1750, size: 2.8, speed: 0.052, damage: 28, coins: 340,
     shootInterval: 1.25, projectileSpeed: 0.16, projectileDamage: 18,
   },
@@ -291,7 +291,7 @@ function showBossWarning(def) {
 // Shared direct-damage path used by every weapon. Specialized bosses may still
 // intercept standard bullets for weak points, but no weapon is excluded.
 function damageBossTarget(amount, isCrit = false, hitPos = null, options = {}) {
-  if (!bossActive || !bossMesh || !bossData || bossDeathInProgress || bossData.introRising) return false;
+  if (!bossActive || !bossMesh || !bossData || bossDeathInProgress || bossData.introRising || bossData.teleporting) return false;
   const dmg = Math.max(0, Math.round(amount));
   if (!dmg) return false;
 

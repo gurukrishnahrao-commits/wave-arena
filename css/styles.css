@@ -185,7 +185,7 @@ canvas { display: block; touch-action: none; }
 /* Boss Bar */
 #boss-bar {
   position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
-  width: min(500px, 80%); z-index: 15; text-align: center;
+  width: min(680px, 90%); z-index: 15; text-align: center;
 }
 #boss-shield-bar {
   position: relative; background: #0a1a24; border: 1px solid #66ccff;
@@ -195,7 +195,10 @@ canvas { display: block; touch-action: none; }
   height: 100%; background: linear-gradient(90deg, #3d9fff, #66ccff);
   width: 100%; transition: width 0.2s;
 }
-#boss-name { font-size: 12px; letter-spacing: 3px; color: #ff3d6e; margin-bottom: 6px; }
+#boss-name {
+  font-size: 12px; letter-spacing: 3px; color: #ff3d6e; margin-bottom: 6px;
+  line-height: 1.35; text-wrap: balance; text-shadow: 0 0 14px currentColor;
+}
 .boss-hp-container {
   position: relative; background: #1a0a1a; border: 1px solid #ff3d6e;
   border-radius: 4px; height: 14px; overflow: hidden;
