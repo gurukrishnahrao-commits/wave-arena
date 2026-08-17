@@ -21,10 +21,10 @@ const BOSS_DEFS = [
     slamRange: 5, slamCooldown: 2.5,
   },
   {
-    name: 'THE NULL REAVER — RIFT-CLASS EXECUTIONER', type: 'voidreaver',
-    color: 0x0b0613, emissive: 0x6d0b78, coreColor: 0xff3df2,
-    hp: 1750, size: 2.8, speed: 0.052, damage: 28, coins: 340,
-    shootInterval: 1.25, projectileSpeed: 0.16, projectileDamage: 18,
+    name: 'THE WARDEN — AREA-LOCK PROTOCOL', type: 'warden',
+    color: 0x17263d, emissive: 0x173f66, coreColor: 0x39d9ff,
+    hp: 5000, size: 3.05, speed: 0.026, damage: 38, coins: 1000,
+    shootInterval: 3.1, projectileSpeed: 0.17, projectileDamage: 18,
   },
   {
     name: 'THE AETHER REGENT', type: 'aetherregent',
@@ -48,6 +48,37 @@ const BOSS_BY_WAVE = {
   25: BOSS_DEFS[5],
 };
 
+// Shared construction used by the three late-campaign milestone bosses.
+function buildMilestoneBoss(def, position) {
+  showBossWarning(def);
+  const mesh = buildLowPolyAlien({
+    size: def.size, color: def.color, emissive: def.emissive,
+    shape: 'sphere', shootInterval: def.shootInterval,
+  });
+  mesh.position.copy(position);
+  mesh.position.y = def.size * 0.65;
+  scene.add(mesh);
+
+  const core = new THREE.Mesh(
+    new THREE.OctahedronGeometry(def.size * 0.27, 1),
+    new THREE.MeshStandardMaterial({
+      color: def.coreColor, emissive: def.coreColor,
+      emissiveIntensity: 1.4, roughness: 0.3, metalness: 0.35,
+    })
+  );
+  core.position.y = def.size * 0.1;
+  mesh.add(core);
+
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(def.size * 0.72, 0.07, 8, 28),
+    new THREE.MeshBasicMaterial({ color: def.coreColor, transparent: true, opacity: 0.72 })
+  );
+  ring.rotation.x = Math.PI / 2;
+  mesh.add(ring);
+
+  return { mesh, core, ring };
+}
+
 function spawnBoss() {
   bossSpawnedWave = waveNumber;
   bossActive = true;
@@ -70,8 +101,8 @@ function spawnBoss() {
     spawnHiveMotherIntro(def);
     return;
   }
-  if (def.type === 'voidreaver') {
-    spawnVoidReaver(def);
+  if (def.type === 'warden') {
+    spawnWarden(def);
     return;
   }
   if (def.type === 'aetherregent') {
@@ -90,7 +121,7 @@ function updateBoss(delta) {
   if (!bossMesh || !bossData) return;
   if (bossData.type === 'sentinel') { updateSentinelBoss(delta); return; }
   if (bossData.type === 'hivemother') { updateHiveMotherBoss(delta); return; }
-  if (bossData.type === 'voidreaver') { updateVoidReaver(delta); return; }
+  if (bossData.type === 'warden') { updateWarden(delta); return; }
   if (bossData.type === 'aetherregent') { updateAetherRegent(delta); return; }
   if (bossData.type === 'sovereigncore') { updateSovereignCore(delta); return; }
   updateColossusBoss(delta);
@@ -119,9 +150,17 @@ function killBoss() {
   const deathShockwaves = bossData.shockwaves || [];
   const deathAcidProj = bossData.acidProjectiles || [];
   const deathTransients = bossData.transients || [];
+  const deathNodes = bossData.nodes || [];
   const deathActiveAttack = bossData.activeAttack;
   const dyingMesh = bossMesh;
   const deathEffectId = ++bossEffectId;
+  for (const node of deathNodes) {
+    if (!node.mesh || node.destroyed) continue;
+    const enemyIndex = enemies.indexOf(node.mesh);
+    if (enemyIndex >= 0) enemies.splice(enemyIndex, 1);
+    removeAndDispose(node.mesh);
+    node.destroyed = true;
+  }
   for (const transient of deathTransients) {
     const mesh = transient && transient.mesh ? transient.mesh : transient;
     if (mesh) removeAndDispose(mesh);
@@ -292,7 +331,10 @@ function showBossWarning(def) {
 // intercept standard bullets for weak points, but no weapon is excluded.
 function damageBossTarget(amount, isCrit = false, hitPos = null, options = {}) {
   if (!bossActive || !bossMesh || !bossData || bossDeathInProgress || bossData.introRising || bossData.teleporting) return false;
-  const dmg = Math.max(0, Math.round(amount));
+  const rawDamage = Math.max(0, Math.round(amount));
+  if (!rawDamage) return false;
+  const multiplier = Number.isFinite(bossData.damageMultiplier) ? Math.max(0, bossData.damageMultiplier) : 1;
+  const dmg = multiplier > 0 ? Math.max(1, Math.round(rawDamage * multiplier)) : 0;
   if (!dmg) return false;
 
   if (bossData.shieldActive && Number.isFinite(bossData.shieldHp)) {

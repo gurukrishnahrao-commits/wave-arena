@@ -46,6 +46,7 @@ This creates `release/wave-arena.zip`. While the temporary boss test phase is en
 
 ```bash
 node scripts/test_boss_qa.js
+node scripts/test_warden.js
 ```
 
 The build script:
@@ -89,7 +90,8 @@ Prepare a dedicated Poki build with its SDK and event lifecycle. Keep all game a
 
 - Immediate Pulse Rifle start with first-run playable movement, firing, kill, and pickup training.
 - A 25-wave campaign across six arena themes, ending in a final victory encounter.
-- Fixed milestone bosses: Sentinel (5), Hive Mother (10), Null Reaver (15), Aether Regent (20), and Sovereign Core (25). The Null Reaver uses telegraphed rift steps, safe-gap barrages, singularity wells, severance lines, and a temporary Event Horizon contraction.
+- Fixed milestone bosses: Sentinel (5), Hive Mother (10), Warden (15), Aether Regent (20), and Sovereign Core (25). The 5,000-HP Warden escalates from pursuit and telegraphed slams into a four-node arena lockdown, then an armor-window Overdrive loop with expanding shockwaves, radial fire, hazards, and reinforcements.
+- Defeating the Warden awards 1,000 arena coins and permanently unlocks the Warden Core, granting +10% base weapon damage on future campaign runs. Existing wave-15 milestone saves receive the unlock automatically.
 - Seven enemy archetypes, including telegraphed dashers, healing/shield support units, and splitters.
 - Primary and secondary weapons, passives, upgrades, between-wave shops, and checkpoint continues.
 - Permanent Core upgrades, weapon/passive unlocks, achievements, Operations, and lifetime statistics.

@@ -21,6 +21,16 @@ function element(dataset = {}) {
   return { dataset, style: {}, classList: new ClassList(), textContent: '', innerHTML: '', onclick: null, setAttribute() {} };
 }
 
+function testWardenAssetRouting() {
+  const index = read('index.html');
+  const core = read('js/bosses/boss-core.js');
+  assert(index.includes('js/bosses/boss-warden.js'), 'Wave 15 Warden script is not loaded');
+  assert(!index.includes('boss-voidreaver.js'), 'retired Null Reaver script is still loaded');
+  assert(index.includes('W15 · WARDEN'), 'Wave 15 QA control is not labeled for the Warden');
+  assert(core.includes("type: 'warden'"), 'Wave 15 boss definition is not routed to the Warden');
+  assert(core.includes('hp: 5000') && core.includes('coins: 1000'), 'Warden health or coin reward regressed');
+}
+
 function testBossJumpFlow() {
   const ids = Object.fromEntries([
     'boss-test-panel', 'boss-test-dock', 'start-screen', 'hud', 'quick-controls',
@@ -189,6 +199,42 @@ function testSaveIsolation() {
   assert.strictEqual(writes, 0, 'boss test wrote localStorage');
 }
 
+function testWardenCoreProgression() {
+  const timers = [];
+  const coinElement = element();
+  const context = {
+    console, Date, Math, JSON,
+    bossTestMode: false,
+    waveNumber: 15,
+    elapsedTime: 0,
+    permanentStatsApplied: false,
+    stats: { maxHP: 100, hp: 100, attackDamage: 8, speed: 0.1 },
+    coins: 0,
+    localStorage: { setItem() {}, getItem() { return null; } },
+    setTimeout(fn, delay) { timers.push({ fn, delay }); return timers.length; },
+    document: { getElementById(id) { return id === 'coins' ? coinElement : null; } },
+  };
+  vm.createContext(context);
+  vm.runInContext(`${read('js/save.js')}\n;globalThis.wardenCoreTest = { metaProgress, applyPermanentProgression, recordBossDefeat };`, context);
+  const test = context.wardenCoreTest;
+  test.metaProgress.bossMilestones.wave_15 = true; // Existing wave-15 saves must migrate automatically.
+  test.metaProgress.permanent.power = 2;
+  test.applyPermanentProgression();
+  assert.strictEqual(context.stats.attackDamage, 9.9, 'Warden Core did not grant +10% base weapon damage');
+
+  test.metaProgress.bossMilestones.wave_15 = false;
+  for (const achievement of ['first_blood', 'wave_five', 'boss_breaker', 'cut_the_thread', 'hunter', 'wave_ten', 'wave_twenty', 'champion']) {
+    test.metaProgress.achievements[achievement] = 1;
+  }
+  for (const operation of ['salvage_1000', 'kills_500', 'bosses_5', 'runs_10']) test.metaProgress.operations[operation] = 1;
+  timers.length = 0;
+  test.recordBossDefeat();
+  assert.strictEqual(test.metaProgress.bossMilestones.wave_15, true);
+  assert.strictEqual(timers.filter(timer => timer.delay === 1450).length, 1, 'first clear did not announce Warden Core');
+  test.recordBossDefeat();
+  assert.strictEqual(timers.filter(timer => timer.delay === 1450).length, 1, 'repeat clear announced Warden Core twice');
+}
+
 function testDefeatLifecycle() {
   const timers = [];
   const elements = {};
@@ -262,7 +308,9 @@ function testDefeatLifecycle() {
   assert.strictEqual(waveAdvances, 0);
 }
 
+testWardenAssetRouting();
 testBossJumpFlow();
 testSaveIsolation();
+testWardenCoreProgression();
 testDefeatLifecycle();
 console.log('Boss-only QA routing, lifecycle, and persistence tests passed.');

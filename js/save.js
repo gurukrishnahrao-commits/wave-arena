@@ -34,7 +34,8 @@ const ACHIEVEMENTS = [
   { id: 'first_blood', name: 'FIRST BLOOD', desc: 'Defeat your first enemy.', reward: 5, test: m => m.totalKills >= 1 },
   { id: 'wave_five', name: 'GATECRASHER', desc: 'Reach wave 5.', reward: 15, test: m => m.highestWave >= 5 },
   { id: 'boss_breaker', name: 'BOSS BREAKER', desc: 'Defeat an arena boss.', reward: 20, test: m => m.bossesDefeated >= 1 },
-  { id: 'cut_the_thread', name: 'CUT THE THREAD', desc: 'Defeat the Null Reaver on wave 15.', reward: 40, test: m => !!m.bossMilestones?.wave_15 },
+  // Keep the original id so wave-15 achievement state from existing saves remains valid.
+  { id: 'cut_the_thread', name: 'BREAK THE LOCK', desc: 'Defeat the Warden on wave 15.', reward: 40, test: m => !!m.bossMilestones?.wave_15 },
   { id: 'hunter', name: 'HUNDRED DOWN', desc: 'Defeat 100 enemies across all runs.', reward: 25, test: m => m.totalKills >= 100 },
   { id: 'wave_ten', name: 'DEEP RUN', desc: 'Reach wave 10.', reward: 30, test: m => m.highestWave >= 10 },
   { id: 'wave_twenty', name: 'LAST SECTOR', desc: 'Reach wave 20.', reward: 50, test: m => m.highestWave >= 20 },
@@ -154,13 +155,18 @@ function recordWaveReached(wave) {
 
 function recordBossDefeat() {
   if (bossTestMode) return;
+  const milestoneKey = `wave_${waveNumber}`;
+  const firstClear = !metaProgress.bossMilestones[milestoneKey];
   metaProgress.bossesDefeated++;
-  metaProgress.bossMilestones[`wave_${waveNumber}`] = true;
+  metaProgress.bossMilestones[milestoneKey] = true;
   const reward = 12 + Math.floor(waveNumber * 1.4);
   metaProgress.cores += reward;
   checkAchievements(false);
   persistMeta();
   setTimeout(() => flashProgressToast(`+${reward} META CORES · BOSS REWARD`), 700);
+  if (waveNumber === 15 && firstClear) {
+    setTimeout(() => flashProgressToast('WARDEN CORE UNLOCKED · +10% BASE WEAPON DAMAGE'), 1450);
+  }
 }
 
 function recordCampaignVictory() {
@@ -234,6 +240,7 @@ function applyPermanentProgression() {
   stats.maxHP += p.vitality * 8;
   stats.hp = stats.maxHP;
   stats.attackDamage += p.power * 0.5;
+  if (metaProgress.bossMilestones.wave_15) stats.attackDamage *= 1.1;
   stats.speed *= 1 + p.mobility * 0.04;
   coins += p.fortune * 6;
   document.getElementById('coins').textContent = coins;
@@ -289,6 +296,13 @@ function renderMetaScreen() {
       <button ${disabled ? 'disabled' : ''} onclick="buyPermanentUpgrade('${def.id}')">${maxed ? 'MAX RANK' : `UPGRADE · ${cost} CORES`}</button>
     </article>`;
   }).join('');
+  const wardenCoreUnlocked = !!metaProgress.bossMilestones.wave_15;
+  const wardenCoreCard = `<article class="meta-card warden-core ${wardenCoreUnlocked ? 'unlocked' : 'locked'}">
+    <div class="meta-icon">⬡</div>
+    <h3>WARDEN CORE</h3><p>Permanent +10% base weapon damage</p>
+    <div class="rank-pips"><i class="${wardenCoreUnlocked ? 'filled' : ''}"></i></div>
+    <div class="core-status">${wardenCoreUnlocked ? 'CORE ONLINE' : 'DEFEAT WAVE 15 WARDEN'}</div>
+  </article>`;
 
   const unlocks = WEAPONS.map(w => {
     const unlocked = isWeaponUnlocked(w.id);
@@ -329,7 +343,7 @@ function renderMetaScreen() {
       <div><strong>${metaProgress.victories}</strong><span>VICTORIES</span></div>
     </section>
     <h2>ACTIVE OPERATIONS</h2><div class="operation-grid">${operations}</div>
-    <h2>PERMANENT AUGMENTS</h2><div class="meta-grid">${upgrades}</div>
+    <h2>PERMANENT AUGMENTS</h2><div class="meta-grid">${upgrades}${wardenCoreCard}</div>
     <div class="meta-columns"><section><h2>ARSENAL UNLOCKS</h2>${unlocks}</section><section><h2>ACHIEVEMENTS</h2>${achievements}</section></div>
   `;
 }
@@ -413,7 +427,7 @@ function cleanupBoss() {
   bossDeathInProgress = false;
   if (bossData) {
     const disposed = new Set();
-    const arrayKeys = ['nests', 'eggs', 'puddles', 'shockwaves', 'acidProjectiles', 'hazards', 'transients', 'mines', 'beams', 'warnings'];
+    const arrayKeys = ['nests', 'eggs', 'puddles', 'shockwaves', 'acidProjectiles', 'hazards', 'transients', 'mines', 'beams', 'warnings', 'nodes'];
     for (const key of arrayKeys) {
       for (const entry of (bossData[key] || [])) {
         if (entry.bubbles) {
@@ -425,6 +439,10 @@ function cleanupBoss() {
         }
         const mesh = entry.mesh || entry;
         if (!mesh || disposed.has(mesh)) continue;
+        if (mesh.userData?.wardenNode) {
+          const enemyIndex = enemies.indexOf(mesh);
+          if (enemyIndex >= 0) enemies.splice(enemyIndex, 1);
+        }
         disposed.add(mesh);
         removeAndDispose(mesh);
       }
