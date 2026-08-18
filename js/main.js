@@ -280,7 +280,9 @@ function gameOver() {
   document.getElementById('pause-btn').setAttribute('aria-pressed', 'false');
 
   cleanupBoss();
-  if (ambientLight) ambientLight.intensity = 0.8;
+  const arenaTheme = ARENA_THEMES[currentArena] || ARENA_THEMES[0];
+  if (arenaTheme) applyArenaTheme(arenaTheme);
+  if (scene.fog) { scene.fog.near = 15; scene.fog.far = 35; }
 
   const el = document.getElementById('center-msg');
   el.style.transition = '';

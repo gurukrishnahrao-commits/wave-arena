@@ -33,9 +33,14 @@ function setupInput() {
   window.addEventListener('mousedown', e => {
     const clickedControl = e.target instanceof Element && e.target.closest('button');
     if (e.button === 0 && gameState === 'playing' && !clickedControl) {
+      AudioManager.resume();
+      if (bossData?.type === 'hunter' && bossData.lastHitState === 'stunned'
+          && typeof tryHunterFinalShot === 'function') {
+        tryHunterFinalShot(false);
+        return;
+      }
       mouseDown = true;
       fireOnDemand = true;
-      AudioManager.resume();
     }
   });
 

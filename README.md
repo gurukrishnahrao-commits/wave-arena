@@ -47,6 +47,7 @@ This creates `release/wave-arena.zip`. While the temporary boss test phase is en
 ```bash
 node scripts/test_boss_qa.js
 node scripts/test_warden.js
+node scripts/test_hunter.js
 ```
 
 The build script:
@@ -86,11 +87,11 @@ Prepare a dedicated Poki build with its SDK and event lifecycle. Keep all game a
 
 ## Current game features
 
-> **Temporary QA control:** the start screen currently exposes boss-only jumps for waves 5, 10, 15, 20, and 25. Boss-test runs use a fixed QA loadout and do not write progression. Remove the marked boss-test code and UI before final release.
+> **Temporary QA control:** the start screen currently exposes boss-only jumps for waves 5, 10, 15, and 20. Boss-test runs use a fixed QA loadout and do not write progression. Remove the marked boss-test code and UI before final release.
 
 - Immediate Pulse Rifle start with first-run playable movement, firing, kill, and pickup training.
-- A 25-wave campaign across six arena themes, ending in a final victory encounter.
-- Fixed milestone bosses: Sentinel (5), Hive Mother (10), Warden (15), Aether Regent (20), and Sovereign Core (25). The 5,000-HP Warden fires a telegraphed plasma beam every second in phase one. At 50% health, it creates two combat clones; all three Wardens continue the one-second plasma attack and launch glowing cryo balls every five seconds that briefly freeze movement and weapons on hit.
+- A 20-wave campaign across five arena themes, ending with The Hunter and its scripted last-hit duel.
+- Fixed milestone bosses: Sentinel (5), Hive Mother (10), Warden (15), and final boss The Hunter (20). The Hunter moves through a clue-led hunt, flashlight-dependent darkness, colored traps, an aggressive charge pattern, and an unarmed wall-crash/final-shot sequence. The 5,000-HP Warden fires a telegraphed plasma beam every second in phase one. At 50% health, it creates two combat clones; all three Wardens continue the one-second plasma attack and launch glowing cryo balls every five seconds that briefly freeze movement and weapons on hit.
 - Defeating the Warden awards 1,000 arena coins and permanently unlocks the Warden Core, granting +10% base weapon damage on future campaign runs. Existing wave-15 milestone saves receive the unlock automatically.
 - Seven enemy archetypes, including telegraphed dashers, healing/shield support units, and splitters.
 - Primary and secondary weapons, passives, upgrades, between-wave shops, and checkpoint continues.

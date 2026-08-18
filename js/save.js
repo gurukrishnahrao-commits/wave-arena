@@ -39,7 +39,7 @@ const ACHIEVEMENTS = [
   { id: 'hunter', name: 'HUNDRED DOWN', desc: 'Defeat 100 enemies across all runs.', reward: 25, test: m => m.totalKills >= 100 },
   { id: 'wave_ten', name: 'DEEP RUN', desc: 'Reach wave 10.', reward: 30, test: m => m.highestWave >= 10 },
   { id: 'wave_twenty', name: 'LAST SECTOR', desc: 'Reach wave 20.', reward: 50, test: m => m.highestWave >= 20 },
-  { id: 'champion', name: 'ARENA CHAMPION', desc: 'Defeat the final boss on wave 25.', reward: 100, test: m => m.victories >= 1 },
+  { id: 'champion', name: 'ARENA CHAMPION', desc: 'Defeat The Hunter, the final boss on wave 20.', reward: 100, test: m => m.victories >= 1 },
 ];
 
 const OPERATIONS = [
@@ -82,7 +82,7 @@ function normalizeMeta(raw) {
   metaProgress.cores = Number(metaProgress.cores) || 0;
   metaProgress.totalCoins = Number(metaProgress.totalCoins) || 0;
   metaProgress.gamesPlayed = Number(metaProgress.gamesPlayed) || 0;
-  metaProgress.highestWave = Number(metaProgress.highestWave) || 0;
+  metaProgress.highestWave = Math.min(Number(metaProgress.highestWave) || 0, CONFIG.FINAL_WAVE);
   metaProgress.totalKills = Number(metaProgress.totalKills) || 0;
   metaProgress.bossesDefeated = Number(metaProgress.bossesDefeated) || 0;
   metaProgress.bossMilestones = { ...(safe.bossMilestones || {}) };
@@ -373,20 +373,20 @@ function cycleQuality() {
 function saveCheckpoint() {
   if (bossTestMode) return;
   checkpoint = {
-    waveNumber, coins, killCount,
+    waveNumber: Math.min(waveNumber, CONFIG.FINAL_WAVE), coins, killCount,
     stats: { ...stats },
-    bossSpawnedWave,
+    bossSpawnedWave: Math.min(bossSpawnedWave, CONFIG.FINAL_WAVE),
   };
   saveMeta();
 }
 
 function loadCheckpoint() {
   if (!checkpoint) return;
-  waveNumber = checkpoint.waveNumber;
+  waveNumber = Math.min(Number(checkpoint.waveNumber) || 1, CONFIG.FINAL_WAVE);
   coins = checkpoint.coins;
   killCount = checkpoint.killCount;
   Object.assign(stats, checkpoint.stats);
-  bossSpawnedWave = checkpoint.bossSpawnedWave;
+  bossSpawnedWave = Math.min(Number(checkpoint.bossSpawnedWave) || 0, CONFIG.FINAL_WAVE);
   document.getElementById('coins').textContent = Math.floor(coins);
   document.getElementById('kills').textContent = killCount;
 }

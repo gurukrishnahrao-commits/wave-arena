@@ -26,16 +26,9 @@ const BOSS_DEFS = [
     hp: 5000, size: 3.05, speed: 0.026, damage: 38, coins: 1000,
   },
   {
-    name: 'THE AETHER REGENT', type: 'aetherregent',
-    color: 0x073c54, emissive: 0x002b3a, coreColor: 0x38f8ff,
-    hp: 2550, size: 3.15, speed: 0.044, damage: 31, coins: 430,
-    shootInterval: 1.1, projectileSpeed: 0.18, projectileDamage: 20,
-  },
-  {
-    name: 'THE SOVEREIGN CORE', type: 'sovereigncore',
-    color: 0x521018, emissive: 0x2e0007, coreColor: 0xffd03d,
-    hp: 3800, size: 3.45, speed: 0.04, damage: 36, coins: 600,
-    shootInterval: 0.95, projectileSpeed: 0.19, projectileDamage: 23,
+    name: 'THE HUNTER', type: 'hunter',
+    color: 0x14161c, emissive: 0x05070a, coreColor: 0xff3d3d,
+    hp: 6000, size: 2.25, speed: 0.16, damage: 38, coins: 1500,
   },
 ];
 
@@ -44,10 +37,9 @@ const BOSS_BY_WAVE = {
   10: BOSS_DEFS[1],
   15: BOSS_DEFS[3],
   20: BOSS_DEFS[4],
-  25: BOSS_DEFS[5],
 };
 
-// Shared construction used by the three late-campaign milestone bosses.
+// Shared construction used by late-campaign milestone bosses.
 function buildMilestoneBoss(def, position) {
   showBossWarning(def);
   const mesh = buildLowPolyAlien({
@@ -104,12 +96,8 @@ function spawnBoss() {
     spawnWarden(def);
     return;
   }
-  if (def.type === 'aetherregent') {
-    spawnAetherRegent(def);
-    return;
-  }
-  if (def.type === 'sovereigncore') {
-    spawnSovereignCore(def);
+  if (def.type === 'hunter') {
+    spawnHunter(def);
     return;
   }
 
@@ -121,12 +109,14 @@ function updateBoss(delta) {
   if (bossData.type === 'sentinel') { updateSentinelBoss(delta); return; }
   if (bossData.type === 'hivemother') { updateHiveMotherBoss(delta); return; }
   if (bossData.type === 'warden') { updateWarden(delta); return; }
-  if (bossData.type === 'aetherregent') { updateAetherRegent(delta); return; }
-  if (bossData.type === 'sovereigncore') { updateSovereignCore(delta); return; }
+  if (bossData.type === 'hunter') { updateHunter(delta); return; }
   updateColossusBoss(delta);
 }
 
 function clearBossPlayerEffects() {
+  if (bossData?.type === 'hunter' && typeof cleanupHunterEncounter === 'function') {
+    cleanupHunterEncounter(bossData);
+  }
   if (!player?.userData) return;
   const freezeShell = player.userData.freezeShell;
   if (freezeShell) {
@@ -137,6 +127,10 @@ function clearBossPlayerEffects() {
     delete player.userData.freezeShell;
   }
   player.userData.frozenUntil = 0;
+  player.userData.slowedUntil = 0;
+  player.userData.weaponsDisabledUntil = 0;
+  player.userData.weaponLockedByHunter = false;
+  if (typeof setPlayerWeaponVisible === 'function') setPlayerWeaponVisible(true);
 }
 
 function killBoss() {
@@ -339,8 +333,26 @@ function damageBossTarget(amount, isCrit = false, hitPos = null, options = {}) {
   const rawDamage = Math.max(0, Math.round(amount));
   if (!rawDamage) return false;
   const multiplier = Number.isFinite(bossData.damageMultiplier) ? Math.max(0, bossData.damageMultiplier) : 1;
-  const dmg = multiplier > 0 ? Math.max(1, Math.round(rawDamage * multiplier)) : 0;
+  let dmg = multiplier > 0 ? Math.max(1, Math.round(rawDamage * multiplier)) : 0;
   if (!dmg) return false;
+
+  if (bossData.type === 'hunter') {
+    if (bossData.lastHitState) return false;
+    const phaseFloors = { 1: 0.7, 2: 0.4, 3: 0.15 };
+    const phaseFloorRatio = phaseFloors[bossData.phase];
+    if (phaseFloorRatio) {
+      const phaseFloor = Math.ceil(bossData.hp * phaseFloorRatio);
+      if (bossData.currentHp <= phaseFloor) return false;
+      dmg = Math.min(dmg, bossData.currentHp - phaseFloor);
+    }
+    const lastHitFloor = Math.max(1, Math.ceil(bossData.hp * 0.05));
+    if (bossData.currentHp - dmg <= lastHitFloor) {
+      bossData.currentHp = lastHitFloor;
+      updateBossHPBar(bossData);
+      startHunterLastHit();
+      return true;
+    }
+  }
 
   if (bossData.shieldActive && Number.isFinite(bossData.shieldHp)) {
     bossData.shieldHp -= dmg;

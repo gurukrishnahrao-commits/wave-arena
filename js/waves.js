@@ -1,5 +1,5 @@
 // ============================================
-// WAVE LOGIC — 25-wave campaign and transitions
+// WAVE LOGIC — 20-wave campaign and transitions
 // ============================================
 
 const ARENA_THEMES = [
@@ -27,11 +27,6 @@ const ARENA_THEMES = [
     name: 'CHRONO VAULT', wave: 20, bg: 0x030916, fog: 0x030916, ground: 0x06132a,
     ambient: { color: 0x193366, intensity: 0.75 }, dir: { color: 0x55bbff, intensity: 0.9 },
     wall: 0x55bbff, rings: 0x173d77,
-  },
-  {
-    name: 'SOVEREIGN CORE', wave: 25, bg: 0x110108, fog: 0x110108, ground: 0x21030f,
-    ambient: { color: 0x661833, intensity: 0.9 }, dir: { color: 0xff3355, intensity: 1.1 },
-    wall: 0xffd23d, rings: 0x771d35,
   },
 ];
 

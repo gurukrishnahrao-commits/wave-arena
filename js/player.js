@@ -56,6 +56,7 @@ function buildLowPolyHuman() {
 
   // Gun
   const gun = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.32), gunMat);
+  gun.name = 'player-weapon';
   gun.position.set(0.29, -0.22, 0.2);
   group.add(gun);
 
@@ -89,6 +90,19 @@ function isPlayerFrozen() {
   return !!player && (player.userData?.frozenUntil || 0) > elapsedTime;
 }
 
+function isPlayerWeaponsDisabled() {
+  if (!player) return false;
+  return isPlayerFrozen()
+    || !!player.userData?.weaponLockedByHunter
+    || (player.userData?.weaponsDisabledUntil || 0) > elapsedTime;
+}
+
+function setPlayerWeaponVisible(visible) {
+  if (!player) return;
+  const weapon = typeof player.getObjectByName === 'function' ? player.getObjectByName('player-weapon') : null;
+  if (weapon) weapon.visible = visible;
+}
+
 function updatePlayer(delta) {
   const step = frameScale(delta);
   let dx = 0, dz = 0;
@@ -107,8 +121,9 @@ function updatePlayer(delta) {
   if (dx !== 0 || dz !== 0) {
     const len = Math.sqrt(dx * dx + dz * dz);
     if (len > 1) { dx /= len; dz /= len; }
-    player.position.x += dx * stats.speed * step;
-    player.position.z += dz * stats.speed * step;
+    const slowMultiplier = (player.userData?.slowedUntil || 0) > elapsedTime ? 0.42 : 1;
+    player.position.x += dx * stats.speed * slowMultiplier * step;
+    player.position.z += dz * stats.speed * slowMultiplier * step;
     if (isTouchDevice) player.rotation.y = Math.atan2(dx, dz);
 
     clampToArena(player.position);

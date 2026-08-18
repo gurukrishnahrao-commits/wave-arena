@@ -199,7 +199,8 @@ assert(context.player.position.z < frozenPosition.z, 'player movement did not re
 const playerSource = read('js/player.js');
 const weaponsSource = read('js/weapons-update.js');
 assert(playerSource.includes('if (!isPlayerFrozen())'), 'movement does not respect the Warden freeze state');
-assert(weaponsSource.includes('!isPlayerFrozen() && (isTouchDevice || mouseDown)'), 'active weapons do not respect the Warden freeze state');
+assert(playerSource.includes('return isPlayerFrozen()'), 'weapon-disable helper no longer includes the Warden freeze state');
+assert(weaponsSource.includes('!isPlayerWeaponsDisabled() && (isTouchDevice || mouseDown)'), 'active weapons do not respect freeze or trap disable states');
 assert(weaponsSource.includes('if (frozen) continue;'), 'orbital blades remain active while frozen');
 
 const boss = context.bossMesh;
