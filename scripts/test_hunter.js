@@ -100,7 +100,7 @@ const context = {
 
 vm.createContext(context);
 vm.runInContext(`${hunterSource}\n;globalThis.hunterTest = {
-  spawnHunter, enterHunterPhase, updateHunterFlashlight, placeHunterTrap,
+  spawnHunter, enterHunterPhase, updateHunterTracking, placeHunterTrap,
   updateHunterTraps, startHunterLastHit, updateHunterLastHit,
   tryHunterFinalShot, cleanupHunterEncounter,
   finalPattern: HUNTER_FINAL_PATTERN
@@ -118,19 +118,15 @@ assert.strictEqual(context.bossData.damageMultiplier, 0, 'hidden Hunter must not
 assert.deepStrictEqual(Array.from(test.finalPattern), ['charge', 'disappear', 'flank', 'charge', 'trap', 'charge']);
 assert(hunterSource.includes('startHunterCharge(bd, 0.7, false)'), 'phase-one charge telegraph is not 0.7 seconds');
 
-// Phase 2 must apply darkness and couple vulnerability to the aimed flashlight cone.
+// Phase 2 keeps the normal arena lighting and makes the visible Hunter vulnerable.
 test.enterHunterPhase(context.bossData, 2);
-assert(context.document.body.classList.contains('hunter-darkness'));
-assert(context.bossData.flashlight && context.bossData.visionLight, 'darkness did not create player vision lights');
-context.bossMesh.position.set(5, 0, 0);
-context.aimDir.set(1, 0, 0);
-test.updateHunterFlashlight(0.016);
-assert.strictEqual(context.bossData.flashlightContact, true);
-assert.strictEqual(context.bossData.damageMultiplier, 1, 'flashlight contact did not make Hunter vulnerable');
-context.aimDir.set(-1, 0, 0);
-test.updateHunterFlashlight(0.3);
-assert.strictEqual(context.bossData.flashlightContact, false);
-assert.strictEqual(context.bossData.damageMultiplier, 0, 'Hunter stayed vulnerable outside the flashlight');
+assert(!context.document.body.classList.contains('hunter-darkness'));
+assert(!('flashlight' in context.bossData) && !('visionLight' in context.bossData), 'removed Hunter lights were recreated');
+assert.strictEqual(context.bossData.damageMultiplier, 1, 'visible pursuit Hunter is not vulnerable');
+assert(context.bossMesh.userData.hunterBodyMaterials.every(material => material.opacity === 1), 'pursuit Hunter is not fully visible');
+assert.strictEqual(ambientLight.intensity, 0.75, 'phase two changed normal arena ambient light');
+assert.strictEqual(dirLight.intensity, 0.9, 'phase two changed normal arena directional light');
+assert(!/flashlight|hunter-darkness|SpotLight/i.test(hunterSource), 'removed darkness or directional-flashlight code remains');
 
 // Phase 3 guarantees all three trap behaviors.
 test.enterHunterPhase(context.bossData, 3);
@@ -174,7 +170,7 @@ test.cleanupHunterEncounter(context.bossData);
 flushTimers();
 assert.strictEqual(killed, 1, 'a delayed final-shot callback survived encounter cleanup');
 
-// Cleanup must restore lighting and temporary player statuses on every exit path.
+// Cleanup must restore temporary player statuses on every exit path.
 test.cleanupHunterEncounter(context.bossData);
 assert(!context.document.body.classList.contains('hunter-darkness'));
 assert.strictEqual(player.userData.weaponLockedByHunter, false);
@@ -185,7 +181,7 @@ assert.strictEqual(dirLight.intensity, 0.9);
 
 assert(coreSource.includes("const lastHitFloor = Math.max(1, Math.ceil(bossData.hp * 0.05))"));
 assert(coreSource.includes('startHunterLastHit();'), 'boss damage does not hand off to the last-hit duel');
-console.log('Hunter phase gates, flashlight vulnerability, colored traps, wall crash, final shot, and cleanup tests passed.');
+console.log('Hunter phase gates, visible pursuit, colored traps, wall crash, final shot, and cleanup tests passed.');
 
 // Exercise the shared damage interception itself: normal damage must stop at
 // exactly 5% and hand control to the scripted duel instead of killing the boss.

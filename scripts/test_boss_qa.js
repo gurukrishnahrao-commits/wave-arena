@@ -49,7 +49,8 @@ function testMilestoneAssetRouting() {
   assert(!/aetherregent|sovereigncore/i.test(core), 'retired campaign boss routing remains in boss core');
   assert(hunter.includes("const HUNTER_FINAL_PATTERN = ['charge', 'disappear', 'flank', 'charge', 'trap', 'charge']"), 'Hunter final aggression pattern regressed');
   assert(hunter.includes('startHunterCharge(bd, 0.7, false)'), 'Hunter phase-one 0.7-second charge telegraph regressed');
-  assert(hunter.includes('bd.damageMultiplier = revealed ? 1 : 0'), 'flashlight no longer controls Hunter vulnerability');
+  assert(!/flashlight|hunter-darkness|SpotLight/i.test(hunter), 'removed Hunter darkness or directional-flashlight mechanics remain');
+  assert(hunter.includes("THE HUNTER · THE PURSUIT") && hunter.includes('bd.damageMultiplier = 1'), 'visible pursuit phase regressed');
   assert(hunter.includes("const types = ['red', 'blue', 'purple']"), 'Hunter colored trap cycle regressed');
   assert(hunter.includes('startHunterLastHit') && hunter.includes("bd.lastHitState = 'stunned'"), 'Hunter last-hit wall-crash duel regressed');
 }

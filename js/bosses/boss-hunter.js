@@ -109,13 +109,6 @@ function spawnHunter(def) {
     clues: [],
     traps: [],
     timeouts: [],
-    lightingSnapshot: null,
-    hunterLightingActive: false,
-    flashlightRevealTimer: 0,
-    flashlightContact: false,
-    flashlight: null,
-    visionLight: null,
-    flashlightTarget: null,
     lastHitState: null,
     lastTimer: 0,
     lastShotUsed: false,
@@ -162,7 +155,7 @@ function updateHunter(delta) {
   if (nextPhase !== bd.phase) enterHunterPhase(bd, nextPhase);
 
   if (bd.phase === 1) updateHunterHunt(delta);
-  else if (bd.phase === 2 || bd.phase === 3) updateHunterDarkness(delta);
+  else if (bd.phase === 2 || bd.phase === 3) updateHunterTracking(delta);
   else updateHunterFinalCombat(delta);
 
   bossMesh.lookAt(player.position.x, 1.1, player.position.z);
@@ -176,21 +169,20 @@ function enterHunterPhase(bd, phase) {
   removeHunterTelegraph(bd);
   bd.mode = phase === 1 ? 'hidden' : phase === 4 ? 'finalIdle' : 'tracking';
   bd.modeTimer = phase === 4 ? 0.55 : 0;
-  bd.damageMultiplier = phase === 4 ? 1 : 0;
+  bd.damageMultiplier = phase === 1 ? 0 : 1;
 
   if (phase === 2) {
-    activateHunterDarkness(bd);
     bd.pounceTimer = 2.4;
-    document.getElementById('boss-name').textContent = 'THE HUNTER · THE DARKNESS';
-    flashCenterMsg('PHASE II · LIGHT MAKES IT VULNERABLE', '#d9f8ff');
+    setHunterVisual(bd, 1, 1);
+    document.getElementById('boss-name').textContent = 'THE HUNTER · THE PURSUIT';
+    flashCenterMsg('PHASE II · WATCH THE FLANK', '#ffb14a');
   } else if (phase === 3) {
-    activateHunterDarkness(bd);
     bd.pounceTimer = 2.2;
+    setHunterVisual(bd, 1, 1);
     bd.trapTimer = 0.75;
     document.getElementById('boss-name').textContent = 'THE HUNTER · THE TRAPS';
     flashCenterMsg('PHASE III · RED EXPLODES · BLUE SLOWS · PURPLE DISARMS', '#c45cff');
   } else if (phase === 4) {
-    restoreHunterLighting(bd);
     bd.finalPatternIndex = 0;
     setHunterVisual(bd, 1, 1);
     document.getElementById('boss-name').textContent = 'THE HUNTER · NO ESCAPE';
@@ -245,7 +237,7 @@ function startHunterCharge(bd, telegraphTime = 0.7, phase4Action = false) {
   bd.phase4Action = phase4Action;
   bd.mode = 'telegraph';
   bd.modeTimer = telegraphTime;
-  bd.damageMultiplier = bd.phase <= 1 || bd.phase === 4 ? 1 : 0;
+  bd.damageMultiplier = 1;
   setHunterVisual(bd, 1, 1);
   bd.chargeTelegraph = createHunterLine(bossMesh.position, bd.chargeDir, 0xff334d, 0.28);
   bd.transients.push({ mesh: bd.chargeTelegraph });
@@ -315,7 +307,7 @@ function updateHunterCharge(delta) {
     if (bd.modeTimer <= 0 || bd.chargeTravel >= 23 || wall) {
       bd.mode = 'recovery';
       bd.modeTimer = bd.phase === 1 ? 0.55 : 0.32;
-      bd.damageMultiplier = bd.phase === 1 || bd.phase === 4 ? 1 : 0;
+      bd.damageMultiplier = 1;
     }
     return;
   }
@@ -401,96 +393,13 @@ function updateHunterClues(delta) {
   }
 }
 
-function activateHunterDarkness(bd) {
-  if (bd.hunterLightingActive) return;
-  bd.hunterLightingActive = true;
-  bd.lightingSnapshot = {
-    ambientColor: ambientLight?.color.getHex(), ambientIntensity: ambientLight?.intensity,
-    dirColor: dirLight?.color.getHex(), dirIntensity: dirLight?.intensity,
-    background: scene.background?.getHex(), fogColor: scene.fog?.color.getHex(),
-    fogNear: scene.fog?.near, fogFar: scene.fog?.far,
-  };
-  if (ambientLight) { ambientLight.color.setHex(0x020309); ambientLight.intensity = 0.035; }
-  if (dirLight) { dirLight.color.setHex(0x080b12); dirLight.intensity = 0.04; }
-  if (scene.background) scene.background.setHex(0x000103);
-  if (scene.fog) {
-    scene.fog.color.setHex(0x000103);
-    scene.fog.near = 4.5;
-    scene.fog.far = 22;
-  }
-
-  bd.visionLight = new THREE.PointLight(0x8fcfff, 1.6, 7.2, 1.7);
-  bd.flashlight = new THREE.SpotLight(0xe2f7ff, 4.8, 15, Math.PI / 7, 0.5, 1.25);
-  bd.flashlightTarget = new THREE.Object3D();
-  bd.flashlight.target = bd.flashlightTarget;
-  scene.add(bd.visionLight, bd.flashlight, bd.flashlightTarget);
-  document.body.classList.add('hunter-darkness');
-}
-
-function restoreHunterLighting(bd) {
-  if (!bd?.hunterLightingActive) {
-    document.body.classList.remove('hunter-darkness');
-    return;
-  }
-  const snapshot = bd.lightingSnapshot;
-  if (snapshot) {
-    if (ambientLight) {
-      if (Number.isFinite(snapshot.ambientColor)) ambientLight.color.setHex(snapshot.ambientColor);
-      if (Number.isFinite(snapshot.ambientIntensity)) ambientLight.intensity = snapshot.ambientIntensity;
-    }
-    if (dirLight) {
-      if (Number.isFinite(snapshot.dirColor)) dirLight.color.setHex(snapshot.dirColor);
-      if (Number.isFinite(snapshot.dirIntensity)) dirLight.intensity = snapshot.dirIntensity;
-    }
-    if (scene.background && Number.isFinite(snapshot.background)) scene.background.setHex(snapshot.background);
-    if (scene.fog) {
-      if (Number.isFinite(snapshot.fogColor)) scene.fog.color.setHex(snapshot.fogColor);
-      if (Number.isFinite(snapshot.fogNear)) scene.fog.near = snapshot.fogNear;
-      if (Number.isFinite(snapshot.fogFar)) scene.fog.far = snapshot.fogFar;
-    }
-  }
-  for (const light of [bd.visionLight, bd.flashlight]) {
-    if (!light) continue;
-    scene.remove(light);
-    if (typeof light.dispose === 'function') light.dispose();
-  }
-  if (bd.flashlightTarget) scene.remove(bd.flashlightTarget);
-  bd.visionLight = null;
-  bd.flashlight = null;
-  bd.flashlightTarget = null;
-  bd.hunterLightingActive = false;
-  document.body.classList.remove('hunter-darkness');
-}
-
-function updateHunterFlashlight(delta) {
+function updateHunterTracking(delta) {
   const bd = bossData;
-  if (!bd.flashlight || !bd.flashlightTarget) return;
-  bd.visionLight.position.copy(player.position).setY(2.1);
-  bd.flashlight.position.copy(player.position).setY(2.35);
-  bd.flashlightTarget.position.copy(player.position).addScaledVector(aimDir, 10).setY(0.7);
-
-  const toHunter = new THREE.Vector3().subVectors(bossMesh.position, player.position);
-  toHunter.y = 0;
-  const distance = toHunter.length();
-  if (distance > 0.001) toHunter.normalize();
-  bd.flashlightContact = distance <= 14.5 && toHunter.dot(aimDir) >= Math.cos(Math.PI / 7);
-  bd.flashlightRevealTimer = bd.flashlightContact
-    ? 0.16
-    : Math.max(0, bd.flashlightRevealTimer - delta);
-
-  const revealed = bd.flashlightRevealTimer > 0;
-  setHunterVisual(bd, revealed ? 1 : 0.035, revealed ? 1 : 0.1);
-  bd.damageMultiplier = revealed ? 1 : 0;
-  if (revealed && Math.random() < 0.14) spawnDeathParticles(bossMesh.position.clone().setY(1), 0xd9f8ff);
-}
-
-function updateHunterDarkness(delta) {
-  const bd = bossData;
-  updateHunterFlashlight(delta);
+  setHunterVisual(bd, 1, 1);
+  bd.damageMultiplier = 1;
 
   if (bd.mode === 'telegraph' || bd.mode === 'charging' || bd.mode === 'recovery') {
     updateHunterCharge(delta);
-    updateHunterFlashlight(0);
   } else {
     bd.flankTimer -= delta;
     if (bd.flankTimer <= 0) {
@@ -672,7 +581,6 @@ function startHunterLastHit() {
   const bd = bossData;
   if (!bd || bd.type !== 'hunter' || bd.lastHitState) return;
   removeHunterTelegraph(bd);
-  restoreHunterLighting(bd);
   clearHunterOffensiveObjects();
   for (const trap of bd.traps) removeAndDispose(trap.mesh);
   bd.transients = bd.transients.filter(entry => !bd.traps.includes(entry));
@@ -812,8 +720,6 @@ function cleanupHunterEncounter(bd) {
   for (const timeout of (bd.timeouts || [])) clearTimeout(timeout);
   bd.timeouts = [];
   removeHunterTelegraph(bd);
-  restoreHunterLighting(bd);
-  document.body.classList.remove('hunter-darkness');
   if (player?.userData) {
     player.userData.slowedUntil = 0;
     player.userData.weaponsDisabledUntil = 0;
