@@ -3,8 +3,27 @@
 // ============================================
 
 function setupInput() {
-  window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
-  window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+  window.addEventListener('keydown', e => {
+    const key = e.key.toLowerCase();
+    const isButtonAction = e.target instanceof Element && e.target.closest('button');
+    const isPauseKey = key === 'escape' || key === 'p' || (e.code === 'Space' && !isButtonAction);
+
+    if (isPauseKey && !e.repeat) {
+      e.preventDefault();
+      togglePause();
+      return;
+    }
+
+    if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+      e.preventDefault();
+    }
+    keys[key] = true;
+  });
+
+  window.addEventListener('keyup', e => {
+    const key = e.key.toLowerCase();
+    keys[key] = false;
+  });
 
   window.addEventListener('mousemove', e => {
     mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
@@ -12,10 +31,16 @@ function setupInput() {
   });
 
   window.addEventListener('mousedown', e => {
-    if (e.button === 0 && gameState === 'playing') {
+    const clickedControl = e.target instanceof Element && e.target.closest('button');
+    if (e.button === 0 && gameState === 'playing' && !clickedControl) {
+      AudioManager.resume();
+      if (bossData?.type === 'hunter' && bossData.lastHitState === 'stunned'
+          && typeof tryHunterFinalShot === 'function') {
+        tryHunterFinalShot(false);
+        return;
+      }
       mouseDown = true;
       fireOnDemand = true;
-      AudioManager.resume();
     }
   });
 
@@ -23,5 +48,19 @@ function setupInput() {
     if (e.button === 0) mouseDown = false;
   });
 
-  window.addEventListener('blur', () => { mouseDown = false; });
+  window.addEventListener('blur', clearActiveInput);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      clearActiveInput();
+      pauseGame();
+    }
+  });
+}
+
+function clearActiveInput() {
+  mouseDown = false;
+  fireOnDemand = false;
+  keys = {};
+  joystickInput.x = 0;
+  joystickInput.y = 0;
 }

@@ -9,10 +9,9 @@ function initScene() {
 
   camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
 
-  renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  const initialQuality = getGameSettings().quality;
+  renderer = new THREE.WebGLRenderer({ antialias: initialQuality !== 'low', powerPreference: 'high-performance' });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.2;
@@ -20,6 +19,7 @@ function initScene() {
 
   setupLights();
   buildArena();
+  applyGraphicsSettings();
 
   clock = new THREE.Clock();
   window.addEventListener('resize', onResize);
@@ -163,6 +163,23 @@ function buildArena() {
     pillar.position.set(px, 2.5, pz);
     scene.add(pillar);
   }
+}
+
+function applyGraphicsSettings() {
+  if (!renderer) return;
+  const quality = getGameSettings().quality;
+  const autoLow = isTouchDevice || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4);
+  const low = quality === 'low' || (quality === 'auto' && autoLow);
+  const ratio = low ? 1 : Math.min(window.devicePixelRatio || 1, quality === 'high' ? 2 : 1.5);
+  renderer.setPixelRatio(ratio);
+  renderer.setSize(window.innerWidth, window.innerHeight, false);
+  renderer.shadowMap.enabled = !low;
+  if (dirLight) {
+    dirLight.castShadow = !low;
+    dirLight.shadow.mapSize.width = low ? 512 : 1536;
+    dirLight.shadow.mapSize.height = low ? 512 : 1536;
+  }
+  document.getElementById('scanlines').style.display = low ? 'none' : 'block';
 }
 
 function onResize() {

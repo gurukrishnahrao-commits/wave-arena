@@ -40,6 +40,7 @@ function triggerHealthFlash() {
 }
 
 function triggerScreenShake(amount) {
+  if (typeof getGameSettings === 'function' && !getGameSettings().shake) return;
   shakeAmount = Math.max(shakeAmount, amount);
 }
 

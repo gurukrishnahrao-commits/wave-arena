@@ -96,6 +96,8 @@ let sentinelIntroId = 0;
 let hiveIntroId = 0;
 let bossSpawnedWave = -1;
 let bossAmbientLight = null;
+let bossDeathInProgress = false;
+let bossEffectId = 0;
 
 // Invincibility
 let invincibleTimer = 0;
@@ -114,3 +116,19 @@ let previewRenderers = [];
 // Wave/boss timing
 let waveTimer = 0;
 let bossDeathPending = false;
+let finalVictoryPending = false;
+let runMetaStarted = false;
+let permanentStatsApplied = false;
+
+// Temporary boss-only QA phase (disabled/removed before release)
+let bossTestMode = false;
+let bossTestWave = null;
+let bossTestEncounterId = 0;
+
+// First-run training state
+let tutorialActive = false;
+let tutorialStep = 'idle';
+let tutorialStartPos = null;
+let tutorialStartKills = 0;
+let tutorialStartCoins = 0;
+let tutorialEnemySpawned = false;

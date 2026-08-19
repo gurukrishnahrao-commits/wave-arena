@@ -20,15 +20,69 @@ const BOSS_DEFS = [
     hp: 500, size: 2.5, speed: 0.02, damage: 35, coins: 80,
     slamRange: 5, slamCooldown: 2.5,
   },
+  {
+    name: 'THE WARDEN — CRYO-MIRROR PROTOCOL', type: 'warden',
+    color: 0x17263d, emissive: 0x173f66, coreColor: 0x39d9ff,
+    hp: 5000, size: 3.05, speed: 0.026, damage: 38, coins: 1000,
+  },
+  {
+    name: 'THE HUNTER', type: 'hunter',
+    color: 0x14161c, emissive: 0x05070a, coreColor: 0xff3d3d,
+    hp: 6000, size: 2.25, speed: 0.16, damage: 38, coins: 1500,
+  },
 ];
+
+const BOSS_BY_WAVE = {
+  5: BOSS_DEFS[0],
+  10: BOSS_DEFS[1],
+  15: BOSS_DEFS[3],
+  20: BOSS_DEFS[4],
+};
+
+// Shared construction used by late-campaign milestone bosses.
+function buildMilestoneBoss(def, position) {
+  showBossWarning(def);
+  const mesh = buildLowPolyAlien({
+    size: def.size, color: def.color, emissive: def.emissive,
+    shape: 'sphere', shootInterval: def.shootInterval,
+  });
+  mesh.position.copy(position);
+  mesh.position.y = def.size * 0.65;
+  scene.add(mesh);
+
+  const core = new THREE.Mesh(
+    new THREE.OctahedronGeometry(def.size * 0.27, 1),
+    new THREE.MeshStandardMaterial({
+      color: def.coreColor, emissive: def.coreColor,
+      emissiveIntensity: 1.4, roughness: 0.3, metalness: 0.35,
+    })
+  );
+  core.position.y = def.size * 0.1;
+  mesh.add(core);
+
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(def.size * 0.72, 0.07, 8, 28),
+    new THREE.MeshBasicMaterial({ color: def.coreColor, transparent: true, opacity: 0.72 })
+  );
+  ring.rotation.x = Math.PI / 2;
+  mesh.add(ring);
+
+  return { mesh, core, ring };
+}
 
 function spawnBoss() {
   bossSpawnedWave = waveNumber;
   bossActive = true;
+  bossDeathInProgress = false;
+  AudioManager.setMusicMode('boss');
   AudioManager.bossWarning();
 
-  const defIndex = Math.floor((waveNumber / CONFIG.BOSS_EVERY - 1)) % BOSS_DEFS.length;
-  const def = BOSS_DEFS[defIndex];
+  const def = BOSS_BY_WAVE[waveNumber];
+  if (!def) {
+    console.error(`No boss configured for wave ${waveNumber}`);
+    bossActive = false;
+    return;
+  }
 
   if (def.type === 'sentinel') {
     spawnSentinelIntro(def);
@@ -38,8 +92,15 @@ function spawnBoss() {
     spawnHiveMotherIntro(def);
     return;
   }
+  if (def.type === 'warden') {
+    spawnWarden(def);
+    return;
+  }
+  if (def.type === 'hunter') {
+    spawnHunter(def);
+    return;
+  }
 
-  // Colossus (default)
   spawnColossus(def);
 }
 
@@ -47,10 +108,35 @@ function updateBoss(delta) {
   if (!bossMesh || !bossData) return;
   if (bossData.type === 'sentinel') { updateSentinelBoss(delta); return; }
   if (bossData.type === 'hivemother') { updateHiveMotherBoss(delta); return; }
+  if (bossData.type === 'warden') { updateWarden(delta); return; }
+  if (bossData.type === 'hunter') { updateHunter(delta); return; }
   updateColossusBoss(delta);
 }
 
+function clearBossPlayerEffects() {
+  if (bossData?.type === 'hunter' && typeof cleanupHunterEncounter === 'function') {
+    cleanupHunterEncounter(bossData);
+  }
+  if (!player?.userData) return;
+  const freezeShell = player.userData.freezeShell;
+  if (freezeShell) {
+    if (bossData?.transients) {
+      bossData.transients = bossData.transients.filter(entry => (entry.mesh || entry) !== freezeShell);
+    }
+    removeAndDispose(freezeShell);
+    delete player.userData.freezeShell;
+  }
+  player.userData.frozenUntil = 0;
+  player.userData.slowedUntil = 0;
+  player.userData.weaponsDisabledUntil = 0;
+  player.userData.weaponLockedByHunter = false;
+  if (typeof setPlayerWeaponVisible === 'function') setPlayerWeaponVisible(true);
+}
+
 function killBoss() {
+  if (bossDeathInProgress || !bossMesh || !bossData) return;
+  bossDeathInProgress = true;
+  clearBossPlayerEffects();
   bossActive = false;
   document.getElementById('boss-bar').style.display = 'none';
 
@@ -70,7 +156,15 @@ function killBoss() {
   const deathNests = bossData.nests || [];
   const deathShockwaves = bossData.shockwaves || [];
   const deathAcidProj = bossData.acidProjectiles || [];
+  const deathTransients = bossData.transients || [];
+  const deathActiveAttack = bossData.activeAttack;
   const dyingMesh = bossMesh;
+  const deathEffectId = ++bossEffectId;
+  for (const transient of deathTransients) {
+    const mesh = transient && transient.mesh ? transient.mesh : transient;
+    if (mesh) removeAndDispose(mesh);
+  }
+  if (deathActiveAttack?.mesh) removeAndDispose(deathActiveAttack.mesh);
 
   // Null out globals immediately
   bossMesh = null;
@@ -85,9 +179,14 @@ function killBoss() {
   triggerScreenShake(0.2);
 
   function shudderStep() {
+    if (deathEffectId !== bossEffectId) {
+      removeAndDispose(dyingMesh);
+      cleanupCapturedBossEffects();
+      return;
+    }
     const t = (performance.now() - shudderStart) / 1000;
     if (t >= shudderDur) {
-      scene.remove(dyingMesh);
+      removeAndDispose(dyingMesh);
       spawnDeathExplosion();
       return;
     }
@@ -103,7 +202,37 @@ function killBoss() {
   }
   requestAnimationFrame(shudderStep);
 
+  let capturedEffectsCleaned = false;
+  function cleanupCapturedBossEffects() {
+    if (capturedEffectsCleaned) return;
+    capturedEffectsCleaned = true;
+    if (deathType !== 'hivemother') return;
+    for (const egg of deathEggs) {
+      if (!egg.mesh) continue;
+      const pos = egg.mesh.position.clone();
+      removeAndDispose(egg.mesh);
+      if (deathEffectId === bossEffectId) spawnDeathParticles(pos, 0xaa44ff);
+    }
+    for (const puddle of deathPuddles) removeAcidPuddle(puddle);
+    for (const nest of deathNests) {
+      if (!nest.mesh) continue;
+      const pos = nest.mesh.position.clone();
+      removeAndDispose(nest.mesh);
+      if (deathEffectId === bossEffectId) spawnDeathParticles(pos, 0x9944ff);
+    }
+    for (const sw of deathShockwaves) {
+      if (sw.mesh) removeAndDispose(sw.mesh);
+    }
+    for (const ap of deathAcidProj) {
+      if (ap.mesh) removeAndDispose(ap.mesh);
+    }
+  }
+
   function spawnDeathExplosion() {
+    if (deathEffectId !== bossEffectId) {
+      cleanupCapturedBossEffects();
+      return;
+    }
     triggerColorFlash('rgba(255,255,255,0.55)', 90, 500);
     triggerScreenShake(0.7);
     timeScale = 0.2;
@@ -112,6 +241,7 @@ function killBoss() {
 
     for (let i = 0; i < 5; i++) {
       setTimeout(() => {
+        if (deathEffectId !== bossEffectId) return;
         spawnDeathParticles(deathPos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 2, 0, (Math.random() - 0.5) * 2)), deathColor);
         spawnDeathParticles(deathPos.clone(), 0xffd23d);
         triggerScreenShake(0.4);
@@ -120,6 +250,7 @@ function killBoss() {
 
     for (let j = 0; j < 8; j++) {
       setTimeout(() => {
+        if (deathEffectId !== bossEffectId) return;
         const pos = deathPos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3, 0.5, (Math.random() - 0.5) * 3));
         spawnCoinPickup(pos, Math.floor(deathCoins / 8));
       }, j * 80);
@@ -130,34 +261,14 @@ function killBoss() {
       const upgradable = equippedWeapons().find(w => w && !w.upgrade.applied);
       if (upgradable) {
         upgradable.upgrade.applied = true;
-        setTimeout(() => flashCenterMsg(`⚙ ${upgradable.upgrade.name} UNLOCKED!`, '#66ccff'), 900);
+        setTimeout(() => {
+          if (deathEffectId === bossEffectId) flashCenterMsg(`⚙ ${upgradable.upgrade.name} UNLOCKED!`, '#66ccff');
+        }, 900);
       }
       stats.hp = stats.maxHP;
     }
 
-    // Hive Mother cleanup
-    if (deathType === 'hivemother') {
-      for (const egg of deathEggs) {
-        if (egg.mesh) {
-          scene.remove(egg.mesh);
-          spawnDeathParticles(egg.mesh.position, 0xaa44ff);
-        }
-      }
-      for (const puddle of deathPuddles) removeAcidPuddle(puddle);
-      for (const nest of deathNests) {
-        if (nest.mesh) {
-          scene.remove(nest.mesh);
-          spawnDeathParticles(nest.mesh.position, 0x9944ff);
-        }
-      }
-      for (const sw of deathShockwaves) {
-        if (sw.mesh) scene.remove(sw.mesh);
-      }
-      for (const ap of deathAcidProj) {
-        if (ap.mesh) scene.remove(ap.mesh);
-      }
-    }
-
+    cleanupCapturedBossEffects();
     flashCenterMsg('BOSS DEFEATED!', '#ffd23d');
   }
 }
@@ -215,6 +326,55 @@ function showBossWarning(def) {
   }, 2000);
 }
 
+// Shared direct-damage path used by every weapon. Specialized bosses may still
+// intercept standard bullets for weak points, but no weapon is excluded.
+function damageBossTarget(amount, isCrit = false, hitPos = null, options = {}) {
+  if (!bossActive || !bossMesh || !bossData || bossDeathInProgress || bossData.introRising || bossData.teleporting) return false;
+  const rawDamage = Math.max(0, Math.round(amount));
+  if (!rawDamage) return false;
+  const multiplier = Number.isFinite(bossData.damageMultiplier) ? Math.max(0, bossData.damageMultiplier) : 1;
+  let dmg = multiplier > 0 ? Math.max(1, Math.round(rawDamage * multiplier)) : 0;
+  if (!dmg) return false;
+
+  if (bossData.type === 'hunter') {
+    if (bossData.lastHitState) return false;
+    const phaseFloors = { 1: 0.7, 2: 0.4, 3: 0.15 };
+    const phaseFloorRatio = phaseFloors[bossData.phase];
+    if (phaseFloorRatio) {
+      const phaseFloor = Math.ceil(bossData.hp * phaseFloorRatio);
+      if (bossData.currentHp <= phaseFloor) return false;
+      dmg = Math.min(dmg, bossData.currentHp - phaseFloor);
+    }
+    const lastHitFloor = Math.max(1, Math.ceil(bossData.hp * 0.05));
+    if (bossData.currentHp - dmg <= lastHitFloor) {
+      bossData.currentHp = lastHitFloor;
+      updateBossHPBar(bossData);
+      startHunterLastHit();
+      return true;
+    }
+  }
+
+  if (bossData.shieldActive && Number.isFinite(bossData.shieldHp)) {
+    bossData.shieldHp -= dmg;
+    const shieldFill = document.getElementById('boss-shield-fill');
+    if (shieldFill && bossData.maxShieldHp) {
+      shieldFill.style.width = `${Math.max(0, bossData.shieldHp / bossData.maxShieldHp) * 100}%`;
+    }
+    if (bossData.shieldHp <= 0 && bossData.type === 'sentinel') breakSentinelShield();
+  } else {
+    bossData.currentHp -= dmg;
+  }
+
+  const pos = hitPos ? hitPos.clone() : bossMesh.position.clone();
+  flashBossHit(bossData, pos);
+  if (!options.silentNumber) {
+    pos.y = Math.max(pos.y, bossMesh.position.y + bossData.size + 0.5);
+    spawnDamageNumber(pos, dmg, isCrit);
+  }
+  updateBossHPBar(bossData);
+  return true;
+}
+
 // Update boss HP bar
 function updateBossHPBar(bd) {
   const fill = document.getElementById('boss-hp-fill');
@@ -234,12 +394,10 @@ function checkBossProjectileHits(bd, hitRadius, onHit) {
       if (onHit) {
         onHit(dmg, isCrit, p.position);
       } else {
-        bd.currentHp -= dmg;
-        flashBossHit(bd, bossMesh.position.clone().add(new THREE.Vector3(0, bd.size * 0.15, 0)));
-        spawnDamageNumber(bossMesh.position.clone().add(new THREE.Vector3(0, bd.size + 0.5, 0)), dmg, isCrit);
+        damageBossTarget(dmg, isCrit, p.position);
       }
-      scene.remove(p);
       projectiles.splice(i, 1);
+      releasePlayerProjectile(p);
     }
   }
   for (let i = fireballs.length - 1; i >= 0; i--) {
@@ -248,11 +406,10 @@ function checkBossProjectileHits(bd, hitRadius, onHit) {
       if (onHit) {
         onHit(fbDmg, false, fireballs[i].position);
       } else {
-        bd.currentHp -= fbDmg;
-        flashBossHit(bd, bossMesh.position.clone().add(new THREE.Vector3(0, bd.size * 0.15, 0)));
+        damageBossTarget(fbDmg, false, fireballs[i].position);
       }
       spawnDeathParticles(fireballs[i].position, 0xff4400);
-      scene.remove(fireballs[i]);
+      removeAndDispose(fireballs[i]);
       fireballs.splice(i, 1);
     }
   }

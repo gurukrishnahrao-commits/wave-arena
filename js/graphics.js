@@ -18,7 +18,7 @@ function updateGraphics(delta) {
     t.mesh.material.opacity = ratio * 0.45;
     t.mesh.scale.setScalar(0.3 + ratio * 0.7);
     if (t.life <= 0) {
-      scene.remove(t.mesh);
+      removeAndDispose(t.mesh);
       playerTrail.splice(i, 1);
     }
   }
@@ -27,7 +27,7 @@ function updateGraphics(delta) {
   if (combatLight) {
     combatLight.position.x = player.position.x;
     combatLight.position.z = player.position.z;
-    combatLightIntensity *= 0.9;
+    combatLightIntensity *= Math.pow(0.9, frameScale(delta));
     combatLight.intensity = combatLightIntensity;
   }
 
